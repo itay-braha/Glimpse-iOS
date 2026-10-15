@@ -79,6 +79,43 @@ struct VideoFlowTests {
         #expect(video.isUnavailable)
     }
 
+    @Test func postsAreDatedFromTheirLinks() throws {
+        let tiktok = try #require(EmbedLink.parse("https://www.tiktok.com/@maya.tlv/video/\(PostIDs.tiktok(daysAgo: 20))"))
+        let reel = try #require(EmbedLink.parse("https://www.instagram.com/reel/\(PostIDs.instagram(daysAgo: 45))/"))
+        #expect(abs(try #require(tiktok.postDate).timeIntervalSinceNow + 20 * 86_400) < 5)
+        #expect(abs(try #require(reel.postDate).timeIntervalSinceNow + 45 * 86_400) < 5)
+
+        // Real-world ids from 2023 and 2024 decode to their actual dates.
+        let old = try #require(EmbedLink.parse("https://www.tiktok.com/@maya.tlv/video/7301234567890123456"))
+        #expect(Calendar.current.component(.year, from: try #require(old.postDate)) == 2023)
+        #expect(Recency.isTooOldToAdd(try #require(old.postDate)))
+        let oldReel = try #require(EmbedLink.parse("https://www.instagram.com/reel/C9xYz_AbC12/"))
+        #expect(Calendar.current.component(.year, from: try #require(oldReel.postDate)) == 2024)
+    }
+
+    @Test func postsOlderThanAYearAreRefused() async throws {
+        let backend = DemoBackend(seeded: true)
+        let old = try #require(EmbedLink.parse("https://www.tiktok.com/@maya.tlv/video/\(PostIDs.tiktok(daysAgo: 400))"))
+        await #expect(throws: GlimpseError.clipTooOld) {
+            try await backend.addEmbed(old, promptKey: nil)
+        }
+        let recent = try #require(EmbedLink.parse("https://www.tiktok.com/@maya.tlv/video/\(PostIDs.tiktok(daysAgo: 100))"))
+        let video = try await backend.addEmbed(recent, promptKey: nil)
+        #expect(Recency.label(for: video) == "Posted 3 months ago")
+    }
+
+    @Test func uploadsFilmedOverAYearAgoAreRefused() async throws {
+        let backend = DemoBackend(seeded: true)
+        var clip = RecordedClip(fileURL: URL(fileURLWithPath: "/tmp/old.mp4"), durationSeconds: 9, thumbnailJPEG: nil, source: .upload)
+        clip.capturedAt = .now.addingTimeInterval(-500 * 86_400)
+        await #expect(throws: GlimpseError.clipTooOld) {
+            try await backend.uploadClip(clip)
+        }
+        clip.capturedAt = .now.addingTimeInterval(-60 * 86_400)
+        let video = try await backend.uploadClip(clip)
+        #expect(Recency.label(for: video) == "Filmed 2 months ago")
+    }
+
     @Test func shortShareLinksAreExpandedFirst() {
         #expect(EmbedLink.needsExpansion("https://vm.tiktok.com/ZMabc123/"))
         #expect(EmbedLink.needsExpansion("https://www.tiktok.com/t/ZTabc123/"))
@@ -124,7 +161,7 @@ struct VideoFlowTests {
 
     @Test func demoEmbedsAreAddedOnceWithServerStyleFields() async throws {
         let backend = DemoBackend(seeded: true)
-        let link = try #require(EmbedLink.parse("https://www.instagram.com/reel/C9xYz_AbC12/?igsh=abc"))
+        let link = try #require(EmbedLink.parse("https://www.instagram.com/reel/\(PostIDs.instagram(daysAgo: 30))/?igsh=abc"))
         let video = try await backend.addEmbed(link, promptKey: VibePrompt.quickHello.rawValue)
         #expect(video.isEmbed)
         #expect(video.source == .instagram)
@@ -139,7 +176,7 @@ struct VideoFlowTests {
 
     @Test func linksNeedAClipOfYourOwnAndSortAfterIt() async throws {
         let backend = DemoBackend(seeded: true, withVideos: false)
-        let link = try #require(EmbedLink.parse("https://www.tiktok.com/@maya.tlv/video/7301234567890123456"))
+        let link = try #require(EmbedLink.parse("https://www.tiktok.com/@maya.tlv/video/\(PostIDs.tiktok(daysAgo: 20))"))
         await #expect(throws: GlimpseError.hostedFirst) {
             try await backend.addEmbed(link, promptKey: nil)
         }
@@ -188,5 +225,26 @@ struct VideoFlowTests {
         let backend = DemoBackend(seeded: true, withVideos: false)
         #expect(await backend.fetchMyVideos().isEmpty)
         #expect(await backend.fetchMyProfile()?.isOnboarded == false)
+    }
+}
+
+/// Post ids for a given age, built the way TikTok and Instagram build them, so
+/// tests stay "recent" whenever they run.
+enum PostIDs {
+    static func tiktok(daysAgo: Double) -> String {
+        let seconds = UInt64(Date.now.addingTimeInterval(-daysAgo * 86_400).timeIntervalSince1970)
+        return String((seconds << 32) + 777)
+    }
+
+    static func instagram(daysAgo: Double) -> String {
+        let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
+        let ms = UInt64(Date.now.addingTimeInterval(-daysAgo * 86_400).timeIntervalSince1970 * 1000) - 1_314_220_021_721
+        var id = (ms << 23) + 4242
+        var code = ""
+        for _ in 0..<11 {
+            code = String(alphabet[Int(id % 64)]) + code
+            id /= 64
+        }
+        return code
     }
 }

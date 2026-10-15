@@ -21,11 +21,14 @@ struct LaunchOptions: Sendable {
 
     var forceDemo = false
     var screen: Screen?
+    /// Show the one-time feed tips even in scripted runs (`-showTips`).
+    var showTips = false
 
     static var current: LaunchOptions {
         let arguments = ProcessInfo.processInfo.arguments
         var options = LaunchOptions()
         options.forceDemo = arguments.contains("-demo")
+        options.showTips = arguments.contains("-showTips")
         if let index = arguments.firstIndex(of: "-screen"), arguments.indices.contains(index + 1) {
             options.screen = Screen(rawValue: arguments[index + 1])
         }

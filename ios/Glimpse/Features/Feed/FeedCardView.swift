@@ -1,8 +1,16 @@
 import SwiftUI
 
-/// One full-screen profile: looping video (muted until the viewer unmutes), or a
-/// linked Instagram/TikTok post in the platform's own player; story-style
-/// segments for multiple clips, verified recency tag and a TikTok-style action rail.
+/// One full-screen profile.
+///
+/// How people move around (the same wherever a card appears):
+///   * swipe right = like, swipe left = pass;
+///   * swipe up / down = next / previous person (the feed's paging);
+///   * tap the right / left side = that person's next / previous clip;
+///   * clips play for the viewer's clip time (7 s by default, 5–15 in Settings),
+///     then move to the person's next clip, looping back to the first after the
+///     last; a longer clip shows "+Ns" to watch the rest.
+/// Hosted clips start muted; linked Instagram/TikTok posts play in the platform's
+/// own player and only advance when tapped.
 struct FeedCardView: View {
     let profile: FeedProfile
     let playableURLs: [String: URL]
@@ -14,11 +22,20 @@ struct FeedCardView: View {
     let onReport: () -> Void
 
     @State private var videoIndex = 0
+    /// Bumped to replay a clip from the start (single-clip profiles, loops).
+    @State private var playCycle = 0
+    /// The viewer tapped "+Ns" to watch the rest of this clip.
+    @State private var showFullClip = false
+    @State private var clipStartedAt = Date.now
     @State private var burstID = 0
     @State private var showMeMarker = false
+    @State private var dragX: CGFloat = 0
     @State private var preferences = PlaybackPreferences.shared
     @State private var health = EmbedHealth.shared
+    @AppStorage(PlaybackPreferences.clipSecondsKey) private var clipSeconds = PlaybackPreferences.defaultClipSeconds
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private static let swipeThreshold: CGFloat = 110
 
     private var video: ProfileVideo? {
         videos.indices.contains(videoIndex) ? videos[videoIndex] : videos.last
@@ -30,13 +47,27 @@ struct FeedCardView: View {
         profile.videos.filter { !health.deadForMe.contains($0.id) }
     }
 
+    /// How long the current clip shows before moving on (nil for linked posts).
+    private var clipLimit: Double? {
+        guard let video, !video.isEmbed else { return nil }
+        let length = video.durationSeconds ?? 15
+        return showFullClip ? length : min(clipSeconds, length)
+    }
+
+    /// Seconds left after the clip time, offered behind "+Ns".
+    private var moreSeconds: Int {
+        guard let length = video?.durationSeconds, video?.isEmbed == false, !showFullClip else { return 0 }
+        let extra = length - clipSeconds
+        return extra >= 1 ? Int(extra.rounded()) : 0
+    }
+
     var body: some View {
         ZStack {
             poster
 
             if let video, let path = video.storagePath, let url = playableURLs[path] {
                 LoopingVideoPlayer(url: url, isActive: isActive, isMuted: preferences.isMuted)
-                    .id(video.id)
+                    .id("\(video.id)-\(playCycle)")
                     .allowsHitTesting(false)
             }
 
@@ -72,11 +103,16 @@ struct FeedCardView: View {
             }
 
             VStack(spacing: 0) {
-                if videos.count > 1 {
-                    segments
-                        .padding(.top, insets.top + 60)
-                        .padding(.horizontal, 14)
+                VStack(alignment: .trailing, spacing: 8) {
+                    if videos.count > 1 || clipLimit != nil {
+                        segments
+                    }
+                    if moreSeconds > 0 {
+                        moreButton
+                    }
                 }
+                .padding(.top, insets.top + 60)
+                .padding(.horizontal, 14)
                 Spacer()
                 HStack(alignment: .bottom, spacing: 16) {
                     info
@@ -87,22 +123,20 @@ struct FeedCardView: View {
                 .padding(.bottom, insets.bottom + 18)
             }
 
+            swipeStamp
+
             HeartBurst(trigger: burstID, reduceMotion: reduceMotion)
                 .allowsHitTesting(false)
         }
+        .offset(x: dragX)
+        .rotationEffect(.degrees(reduceMotion ? 0 : Double(dragX / 30)), anchor: .bottom)
+        .simultaneousGesture(swipeGesture)
         .onChange(of: preferences.isMuted) { _, muted in
             if isActive, !muted { FeedSignals.shared.record(.unmute, target: profile.id) }
         }
         .clipped()
-        .task(id: "\(isActive)-\(videoIndex)") {
-            // The "Me" ring shows for the first few seconds of each clip.
-            guard isActive else {
-                showMeMarker = false
-                return
-            }
-            withAnimation(.easeOut(duration: 0.3)) { showMeMarker = true }
-            try? await Task.sleep(for: .seconds(3.5))
-            withAnimation(.easeIn(duration: 0.4)) { showMeMarker = false }
+        .task(id: "\(isActive)-\(videoIndex)-\(playCycle)-\(showFullClip)") {
+            await runClip()
         }
         .accessibilityElement(children: .contain)
         .accessibilityAction(named: "Like") { like() }
@@ -110,6 +144,99 @@ struct FeedCardView: View {
         .accessibilityAction(named: "Next clip") { step(1) }
         .accessibilityAction(named: "Previous clip") { step(-1) }
     }
+
+    // MARK: Clip rhythm
+
+    /// Shows the "Me" ring briefly, then moves on when the clip time is up.
+    private func runClip() async {
+        guard isActive else {
+            showMeMarker = false
+            return
+        }
+        if !showFullClip { clipStartedAt = .now }
+        withAnimation(.easeOut(duration: 0.3)) { showMeMarker = true }
+        Task {
+            try? await Task.sleep(for: .seconds(3.5))
+            withAnimation(.easeIn(duration: 0.4)) { showMeMarker = false }
+        }
+        guard let limit = clipLimit else { return }
+        let remaining = limit - Date.now.timeIntervalSince(clipStartedAt)
+        try? await Task.sleep(for: .seconds(max(remaining, 0.1)))
+        guard !Task.isCancelled else { return }
+        advanceAutomatically()
+    }
+
+    /// After the clip time: the person's next clip, or back to the first after the last.
+    private func advanceAutomatically() {
+        showFullClip = false
+        if videos.count > 1 {
+            videoIndex = (videoIndex + 1) % videos.count
+            if videoIndex == 0 { playCycle += 1 }
+        } else {
+            playCycle += 1
+        }
+    }
+
+    private func step(_ delta: Int) {
+        guard videos.count > 1 else { return }
+        let next = min(max(videoIndex + delta, 0), videos.count - 1)
+        if next > videoIndex { FeedSignals.shared.record(.clipNext, target: profile.id) }
+        showFullClip = false
+        videoIndex = next
+    }
+
+    // MARK: Swipes
+
+    private var swipeGesture: some Gesture {
+        DragGesture(minimumDistance: 24)
+            .onChanged { value in
+                // Horizontal swipes only; vertical ones page between people.
+                let dx = value.translation.width
+                guard abs(dx) > abs(value.translation.height) * 1.2 else { return }
+                dragX = dx
+            }
+            .onEnded { value in
+                let dx = dragX
+                let flung = value.predictedEndTranslation.width
+                let horizontal = abs(value.translation.width) > abs(value.translation.height) * 1.2
+                if horizontal, dx > Self.swipeThreshold || flung > 260 {
+                    finishSwipe(liked: true)
+                } else if horizontal, dx < -Self.swipeThreshold || flung < -260 {
+                    finishSwipe(liked: false)
+                } else {
+                    withAnimation(.spring(duration: 0.3, bounce: 0.3)) { dragX = 0 }
+                }
+            }
+    }
+
+    private func finishSwipe(liked: Bool) {
+        withAnimation(.easeIn(duration: 0.18)) { dragX = liked ? 500 : -500 }
+        Task {
+            try? await Task.sleep(for: .milliseconds(180))
+            if liked { like() } else { onPass() }
+            withAnimation(.spring(duration: 0.35)) { dragX = 0 }
+        }
+    }
+
+    private var swipeStamp: some View {
+        let progress = min(abs(dragX) / Self.swipeThreshold, 1)
+        let liking = dragX > 0
+        return Text(liking ? "LIKE" : "PASS")
+            .font(.system(size: 44, weight: .black, design: .rounded))
+            .foregroundStyle(liking ? Palette.mint : Palette.pink)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 6)
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(liking ? Palette.mint : Palette.pink, lineWidth: 5))
+            .rotationEffect(.degrees(liking ? -14 : 14))
+            .opacity(Double(progress))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: liking ? .topLeading : .topTrailing)
+            .padding(.top, insets.top + 120)
+            .padding(.horizontal, 36)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+
+    // MARK: Pieces
 
     private var poster: some View {
         ZStack {
@@ -142,15 +269,51 @@ struct FeedCardView: View {
         .accessibilityHidden(true)
     }
 
+    /// Story-style bars: done clips full, the current one filling over its clip time.
     private var segments: some View {
-        HStack(spacing: 4) {
-            ForEach(videos.indices, id: \.self) { index in
-                Capsule()
-                    .fill(index == videoIndex ? Palette.textPrimary : Palette.textPrimary.opacity(0.3))
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: !isActive || clipLimit == nil)) { context in
+            HStack(spacing: 4) {
+                ForEach(videos.indices, id: \.self) { index in
+                    GeometryReader { proxy in
+                        Capsule()
+                            .fill(Palette.textPrimary.opacity(0.3))
+                            .overlay(alignment: .leading) {
+                                Capsule()
+                                    .fill(Palette.textPrimary)
+                                    .frame(width: proxy.size.width * fill(for: index, at: context.date))
+                            }
+                    }
                     .frame(height: 3)
+                }
             }
         }
-        .accessibilityHidden(true)
+        .accessibilityElement()
+        .accessibilityLabel("Clip \(videoIndex + 1) of \(videos.count)")
+        .accessibilityIdentifier("clipPosition")
+    }
+
+    private func fill(for index: Int, at date: Date) -> CGFloat {
+        if index < videoIndex { return 1 }
+        if index > videoIndex { return 0 }
+        guard let limit = clipLimit, limit > 0 else { return 1 }
+        return CGFloat(min(max(date.timeIntervalSince(clipStartedAt) / limit, 0), 1))
+    }
+
+    private var moreButton: some View {
+        Button {
+            showFullClip = true
+        } label: {
+            Label("+\(moreSeconds)s", systemImage: "forward.fill")
+                .font(.caption.weight(.heavy))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(.black.opacity(0.4), in: .capsule)
+                .overlay(Capsule().strokeBorder(.white.opacity(0.2)))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Watch the rest of this clip, \(moreSeconds) more seconds")
+        .accessibilityIdentifier("watchMore")
     }
 
     private var info: some View {
@@ -173,6 +336,7 @@ struct FeedCardView: View {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(profile.displayName)
                     .font(.system(.largeTitle, design: .rounded, weight: .heavy))
+                    .accessibilityIdentifier("profileName")
                 Text("\(profile.age)")
                     .font(.system(.title, design: .rounded, weight: .medium))
                     .foregroundStyle(Palette.textPrimary.opacity(0.85))
@@ -201,7 +365,6 @@ struct FeedCardView: View {
         }
         .foregroundStyle(Palette.textPrimary)
         .shadow(color: .black.opacity(0.35), radius: 6, y: 2)
-        .accessibilityElement(children: .combine)
     }
 
     private var actionRail: some View {
@@ -220,13 +383,6 @@ struct FeedCardView: View {
             RailButton(title: "Pass", symbol: "xmark", size: 52, foreground: .white, background: .white.opacity(0.16), action: onPass)
             RailButton(title: "Report", symbol: "flag.fill", size: 44, foreground: .white, background: .white.opacity(0.12), action: onReport)
         }
-    }
-
-    private func step(_ delta: Int) {
-        guard videos.count > 1 else { return }
-        let next = min(max(videoIndex + delta, 0), videos.count - 1)
-        if next > videoIndex { FeedSignals.shared.record(.clipNext, target: profile.id) }
-        videoIndex = next
     }
 
     private func like() {

@@ -4,6 +4,7 @@ struct FeedView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.scenePhase) private var scenePhase
     @State private var model = FeedModel()
+    @AppStorage("glimpse.feedTipsSeen") private var tipsSeen = false
     @State private var reportTarget: FeedProfile?
     @State private var capacityPrompt: FeedProfile?
     @State private var skipCapacityPrompt = false
@@ -17,6 +18,11 @@ struct FeedView: View {
                     emptyState
                 } else {
                     cards(insets: proxy.safeAreaInsets)
+                    if showTips {
+                        FeedTipsOverlay { tipsSeen = true }
+                            .transition(.opacity)
+                            .zIndex(10)
+                    }
                 }
 
                 topBar
@@ -108,6 +114,11 @@ struct FeedView: View {
         }
     }
 
+    /// Once per install (scripted screenshot runs skip it unless `-showTips`).
+    private var showTips: Bool {
+        !tipsSeen && (app.launch.screen == nil || app.launch.showTips)
+    }
+
     private func cards(insets: EdgeInsets) -> some View {
         ScrollView(.vertical) {
             LazyVStack(spacing: 0) {
@@ -115,7 +126,7 @@ struct FeedView: View {
                     FeedCardView(
                         profile: profile,
                         playableURLs: model.playableURLs,
-                        isActive: model.currentID == profile.id && model.celebration == nil,
+                        isActive: model.currentID == profile.id && model.celebration == nil && !showTips,
                         isLiked: model.likedIDs.contains(profile.id),
                         insets: insets,
                         onLike: { like(profile) },

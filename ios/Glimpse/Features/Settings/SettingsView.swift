@@ -16,6 +16,7 @@ struct SettingsView: View {
     @State private var quota: LikeQuota?
     @State private var showPaywall = false
     @State private var pausedUntil: Date?
+    @AppStorage(PlaybackPreferences.clipSecondsKey) private var clipSeconds = PlaybackPreferences.defaultClipSeconds
 
     var body: some View {
         NavigationStack {
@@ -67,6 +68,26 @@ struct SettingsView: View {
                     Text("Vacation mode")
                 } footer: {
                     Text("While you're away you're hidden from discovery, your matches see you're away, nothing counts against you, and auto-release won't touch you.")
+                }
+
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Each clip plays for \(Int(clipSeconds)) seconds")
+                        Slider(value: $clipSeconds, in: PlaybackPreferences.clipSecondsRange, step: 1) {
+                            Text("Clip time")
+                        } minimumValueLabel: {
+                            Text("5s").font(.caption)
+                        } maximumValueLabel: {
+                            Text("15s").font(.caption)
+                        }
+                        .tint(Palette.mint)
+                        .accessibilityValue("\(Int(clipSeconds)) seconds")
+                        .accessibilityIdentifier("settings.clipSeconds")
+                    }
+                } header: {
+                    Text("Playback")
+                } footer: {
+                    Text("Then the next clip starts. Longer clips show a +more button so you can watch the rest.")
                 }
 
                 Section("Notifications") {

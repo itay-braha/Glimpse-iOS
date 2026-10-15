@@ -10,7 +10,7 @@ final class ProfileModel {
     private(set) var mediaURLs: [String: URL] = [:]
     var errorMessage: String?
 
-    var staleVideos: [ProfileVideo] { videos.filter { Recency.isStale($0.importedAt) } }
+    var staleVideos: [ProfileVideo] { videos.filter { Recency.isStale($0.capturedAt) } }
     var canAddVideo: Bool { videos.count < Self.maxVideos }
     /// Links can only sit on top of at least one clip Glimpse hosts.
     var canLink: Bool { videos.contains { !$0.isEmbed } }

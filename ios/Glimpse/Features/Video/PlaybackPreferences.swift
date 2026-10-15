@@ -8,6 +8,11 @@ import SwiftUI
 final class PlaybackPreferences {
     static let shared = PlaybackPreferences()
 
+    /// How long each clip plays in the feed before moving to the next (Settings, 5–15 s).
+    nonisolated static let clipSecondsKey = "glimpse.clipSeconds"
+    nonisolated static let defaultClipSeconds = 7.0
+    nonisolated static let clipSecondsRange: ClosedRange<Double> = 5...15
+
     var isMuted = true
 
     private init() {}

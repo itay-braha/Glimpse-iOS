@@ -111,9 +111,14 @@ final class SupabaseBackend: GlimpseBackend {
             storagePath: videoPath,
             thumbnailPath: thumbnailPath,
             durationSeconds: (clip.durationSeconds * 100).rounded() / 100,
-            promptKey: clip.promptKey
+            promptKey: clip.promptKey,
+            capturedAt: clip.capturedAt
         )
-        return try await client.from("profile_videos").insert(row).select().single().execute().value
+        do {
+            return try await client.from("profile_videos").insert(row).select().single().execute().value
+        } catch let error as PostgrestError where error.message == "too_old" {
+            throw GlimpseError.clipTooOld
+        }
     }
 
     func updateVideoDetails(_ videoID: UUID, promptKey: String?, meMarker: CGPoint?) async throws {
@@ -212,6 +217,7 @@ final class SupabaseBackend: GlimpseBackend {
             case "already_added": throw GlimpseError.videoAlreadyAdded
             case "story_link": throw GlimpseError.storyLink
             case "hosted_first": throw GlimpseError.hostedFirst
+            case "too_old": throw GlimpseError.clipTooOld
             default: throw error
             }
         }
@@ -594,8 +600,11 @@ private struct NewVideoRow: Encodable, Sendable {
     let thumbnailPath: String?
     let durationSeconds: Double
     let promptKey: String?
+    /// When the clip was filmed (camera-roll metadata); the server checks it's within a year.
+    let capturedAt: Date?
 
     enum CodingKeys: String, CodingKey {
+        case capturedAt = "captured_at"
         case userID = "user_id"
         case source
         case storagePath = "storage_path"

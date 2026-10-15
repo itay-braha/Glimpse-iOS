@@ -12,6 +12,8 @@ enum GlimpseError: LocalizedError, Equatable {
     case videoAlreadyAdded
     /// Stories expire, so they're uploaded rather than linked.
     case storyLink
+    /// Filmed or posted more than 12 months ago.
+    case clipTooOld
     /// Links sit on top of at least one clip Glimpse hosts.
     case hostedFirst
     /// The last own clip can't be removed.
@@ -45,6 +47,7 @@ enum GlimpseError: LocalizedError, Equatable {
         case .videoAlreadyAdded: "That video is already on your profile."
         case .hostedFirst: "Add a clip of your own first. Linked posts sit on top of it."
         case .lastHostedClip: "Keep at least one clip of your own. Add another before removing this one."
+        case .clipTooOld: "That clip is more than a year old. Pick something from the last 12 months."
         case .storyLink: "Stories disappear after 24 hours. Save it to your camera roll and upload it instead."
         case .videoTooLarge: "That video is over 20 MB. Try a shorter clip."
         case .outOfLikes: "You're out of likes for now."

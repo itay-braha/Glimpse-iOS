@@ -49,7 +49,7 @@ struct MyProfileView: View {
                                 AddVideoTile { showAddVideo = true }
                             }
                         }
-                        Text("Every moment shows when it was added. Clips older than 90 days get a nudge to rotate. Long-press a clip to make it your cover. Your own clips always come first; linked posts follow.")
+                        Text("Every moment shows when it was filmed. Clips from the last 12 months only; after a year you'll see a nudge to refresh. Long-press a clip to make it your cover. Your own clips always come first; linked posts follow.")
                             .font(.footnote)
                             .foregroundStyle(Palette.textTertiary)
                     }
@@ -147,7 +147,7 @@ private struct RotationPrompt: View {
                 .font(.title2)
                 .foregroundStyle(Palette.pink)
             VStack(alignment: .leading, spacing: 6) {
-                Text(count == 1 ? "1 moment is over 90 days old" : "\(count) moments are over 90 days old")
+                Text(count == 1 ? "1 moment is over a year old" : "\(count) moments are over a year old")
                     .font(.glimpseHeadline)
                 Text("Fresh clips keep your profile honest and get you seen more.")
                     .font(.subheadline)
@@ -169,7 +169,7 @@ private struct VideoTile: View {
     let video: ProfileVideo
     let thumbnailURL: URL?
 
-    private var isStale: Bool { Recency.isStale(video.importedAt) }
+    private var isStale: Bool { Recency.isStale(video.capturedAt) }
     private var needsAttention: Bool { isStale || video.isUnavailable }
 
     var body: some View {
@@ -211,7 +211,7 @@ private struct VideoTile: View {
                         .background(Palette.pink, in: .capsule)
                         .padding(6)
                 } else if isStale {
-                    Text("Rotate")
+                    Text("Refresh")
                         .font(.caption2.weight(.heavy))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 6)
@@ -226,7 +226,7 @@ private struct VideoTile: View {
                     .strokeBorder(needsAttention ? Palette.pink : Palette.stroke, lineWidth: needsAttention ? 2 : 1)
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("\(video.isEmbed ? "\(video.source.displayName) link" : video.source.displayName) moment, \(Recency.label(video.importedAt))\(video.isUnavailable ? ", no longer available, hidden from others" : isStale ? ", needs rotating" : "")")
+            .accessibilityLabel("\(video.isEmbed ? "\(video.source.displayName) link" : video.source.displayName) moment, \(Recency.label(for: video))\(video.isUnavailable ? ", no longer available, hidden from others" : isStale ? ", needs rotating" : "")")
     }
 }
 

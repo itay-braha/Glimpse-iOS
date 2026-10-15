@@ -27,7 +27,7 @@ enum DemoData {
             storagePath: clipURLs[n % clipURLs.count],
             thumbnailPath: nil,
             durationSeconds: source == .native ? 15 : 14,
-            capturedAt: daysAgo(importedDaysAgo + 1, from: now),
+            capturedAt: daysAgo(importedDaysAgo + 9, from: now),
             importedAt: daysAgo(importedDaysAgo, from: now)
         )
     }
@@ -72,7 +72,7 @@ enum DemoData {
         [
             video(1, source: .upload, importedDaysAgo: 3, now: now),
             video(2, source: .native, importedDaysAgo: 12, now: now),
-            video(4, source: .upload, importedDaysAgo: 104, now: now),
+            video(4, source: .upload, importedDaysAgo: 380, now: now),
             embed(90, platform: .instagram, importedDaysAgo: 20, now: now),
         ]
     }

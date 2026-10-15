@@ -38,6 +38,19 @@ final class FlowTests: XCTestCase {
         return XCTWaiter.wait(for: [gone], timeout: timeout) == .completed
     }
 
+    /// The on-screen card's element (the feed keeps neighbours loaded too).
+    private func visible(_ query: XCUIElementQuery) -> XCUIElement? {
+        query.allElementsBoundByIndex.first { $0.exists && $0.isHittable }
+    }
+
+    private func clipPosition(_ app: XCUIApplication) -> String {
+        visible(app.otherElements.matching(identifier: "clipPosition"))?.label ?? "?"
+    }
+
+    private func currentName(_ app: XCUIApplication) -> String {
+        visible(app.staticTexts.matching(identifier: "profileName"))?.label ?? "?"
+    }
+
     private func pause(_ seconds: Double) {
         RunLoop.current.run(until: Date().addingTimeInterval(seconds))
     }
@@ -265,5 +278,63 @@ final class FlowTests: XCTestCase {
         XCTAssertTrue(badge.waitForExistence(timeout: 10))
         pause(1.5)
         snap("6-3 Linked TikTok in its own player")
+    }
+
+    // How people move around a profile and between people (the same in every card).
+    func testFeedNavigation() {
+        let app = XCUIApplication()
+        continueAfterFailure = false
+        app.launchArguments = ["-demo", "-screen", "feed", "-showTips"]
+        app.launch()
+
+        let gotIt = app.buttons["tips.done"]
+        XCTAssertTrue(gotIt.waitForExistence(timeout: 20))
+        snap("7-1 First-time tips")
+        gotIt.tap()
+
+        let window = app.windows.firstMatch
+        XCTAssertTrue(app.buttons["Glimpse"].firstMatch.waitForExistence(timeout: 10))
+        let first = currentName(app)
+        XCTAssertEqual(clipPosition(app), "Clip 1 of 3")
+        snap("7-2 Clip 1 of 3")
+
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.42)).tap()
+        pause(0.8)
+        XCTAssertEqual(clipPosition(app), "Clip 2 of 3")
+        snap("7-3 Tap right: next clip")
+
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.42)).tap()
+        pause(0.8)
+        XCTAssertEqual(clipPosition(app), "Clip 1 of 3")
+
+        // After the clip time (7 s by default) the next clip starts by itself.
+        let advanced = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "Clip 2 of 3"),
+            object: visible(app.otherElements.matching(identifier: "clipPosition"))
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [advanced], timeout: 10), .completed)
+        snap("7-4 After 7 s: next clip on its own")
+
+        let more = visible(app.buttons.matching(identifier: "watchMore"))
+        XCTAssertNotNil(more)
+        more?.tap()
+        pause(0.5)
+        snap("7-5 +more: watching the rest")
+
+        window.swipeUp()
+        pause(1.5)
+        let second = currentName(app)
+        XCTAssertNotEqual(second, first)
+        snap("7-6 Swipe up: next person")
+
+        window.swipeLeft()
+        pause(1.5)
+        let third = currentName(app)
+        XCTAssertNotEqual(third, second)
+        snap("7-7 Swipe left: pass")
+
+        window.swipeRight()
+        XCTAssertTrue(button(app, containing: "anyway").waitForExistence(timeout: 8))
+        snap("7-8 Swipe right: like (at 20, asks first)")
     }
 }

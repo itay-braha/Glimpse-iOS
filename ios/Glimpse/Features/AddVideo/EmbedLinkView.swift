@@ -1,15 +1,21 @@
 import SwiftUI
 
-/// "Link a public Reel or TikTok": nothing is copied; the post plays through the
-/// platform's official player. Because viewers can tap through to the owner's
-/// social profile, adding one requires an explicit acknowledgement. Stories expire,
-/// so they're sent to Quick upload instead.
+/// "Link a public Reel or TikTok", as a guided three-step flow:
+///   1. pick the app (Instagram or TikTok),
+///   2. follow the steps to copy the post's link (with a button that opens the app),
+///   3. paste it here.
+/// Nothing is copied; the post plays through the platform's official player.
+/// Because viewers can tap through to the owner's social profile, adding one
+/// needs an explicit acknowledgement. Stories expire, so they're sent to Quick
+/// upload; posts older than 12 months are refused (the date comes from the link).
 struct EmbedLinkView: View {
     let onAdded: (ProfileVideo) -> Void
     /// Switches to Quick upload (for Stories, which can't be linked).
     var onUseUpload: () -> Void = {}
 
     @Environment(AppModel.self) private var app
+    @Environment(\.openURL) private var openURL
+    @State private var platform: EmbedLink.Platform?
     @State private var text = ""
     @State private var link: EmbedLink?
     @State private var isExpanding = false
@@ -17,24 +23,57 @@ struct EmbedLinkView: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
 
+    private var isTooOld: Bool {
+        link?.postDate.map { Recency.isTooOldToAdd($0) } ?? false
+    }
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                Text("Link a public video")
-                    .font(.glimpseTitle2)
-                Text("Paste a link to one of your public Instagram posts or Reels, or a TikTok video. It plays on your profile through the platform's official player. Nothing is copied to Glimpse.")
-                    .font(.subheadline)
-                    .foregroundStyle(Palette.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Link a public video")
+                        .font(.glimpseTitle2)
+                    Text("Already posted something great? It plays right on your profile. Nothing is copied to Glimpse.")
+                        .font(.subheadline)
+                        .foregroundStyle(Palette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
+                StepHeader(number: 1, title: "Where is it posted?")
+                HStack(spacing: 12) {
+                    PlatformChoice(platform: .instagram, detail: "Reel or post", isSelected: platform == .instagram) {
+                        platform = .instagram
+                    }
+                    PlatformChoice(platform: .tiktok, detail: "Video", isSelected: platform == .tiktok) {
+                        platform = .tiktok
+                    }
+                }
+
+                if let platform {
+                    StepHeader(number: 2, title: "Copy its link")
+                    copySteps(for: platform)
+                }
+
+                StepHeader(number: platform == nil ? 2 : 3, title: "Paste it here")
+                PasteButton(payloadType: String.self) { strings in
+                    if let first = strings.first { text = first }
+                }
+                .buttonBorderShape(.capsule)
+                .controlSize(.large)
+                .tint(Palette.mint)
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("embed.paste")
                 field
+
                 if EmbedLink.isStory(text) {
                     storyNotice
+                } else if isTooOld, let date = link?.postDate {
+                    tooOldNotice(date)
                 } else {
                     status
                 }
 
-                if let link {
+                if let link, !isTooOld {
                     EmbedStage(link: link)
                         .aspectRatio(9 / 16, contentMode: .fit)
                         .frame(maxWidth: 260)
@@ -57,7 +96,7 @@ struct EmbedLinkView: View {
                     }
                 }
                 .buttonStyle(.glimpse)
-                .disabled(link == nil || !consent || isSaving)
+                .disabled(link == nil || isTooOld || !consent || isSaving)
                 .accessibilityIdentifier("embed.add")
             }
             .padding(20)
@@ -67,13 +106,50 @@ struct EmbedLinkView: View {
         .navigationTitle("Link a video")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: text) { await resolve() }
-        .onChange(of: link) { consent = false }
+        .onChange(of: link) { _, newLink in
+            consent = false
+            // A pasted link picks its app, so the steps match what was pasted.
+            if let newLink { platform = newLink.platform }
+        }
     }
+
+    // MARK: Step 2: how to copy the link
+
+    private func copySteps(for platform: EmbedLink.Platform) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            InstructionRow(index: "a", text: platform == .instagram
+                ? "Open the Reel or post in Instagram."
+                : "Open the video in TikTok.")
+            InstructionRow(index: "b", text: platform == .instagram
+                ? "Tap the paper plane (Share) under it."
+                : "Tap the arrow (Share) on the right.")
+            InstructionRow(index: "c", text: "Tap \"Copy link\", then come back here.")
+            Button {
+                openURL(platform == .instagram ? URL(string: "https://www.instagram.com/")! : URL(string: "https://www.tiktok.com/")!)
+            } label: {
+                HStack(spacing: 10) {
+                    PlatformGlyph(platform: platform, size: 26)
+                    Text("Open \(platform.name)")
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.glimpseSecondary)
+            .accessibilityIdentifier("embed.openApp")
+            Text("Only public posts from the last 12 months. Stories can't be linked; upload them instead.")
+                .font(.footnote)
+                .foregroundStyle(Palette.textTertiary)
+        }
+        .padding(14)
+        .background(Palette.surface, in: .rect(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Palette.stroke))
+    }
+
+    // MARK: Step 3: the link
 
     private var field: some View {
         HStack(spacing: 10) {
             Image(systemName: "link").foregroundStyle(Palette.textTertiary)
-            TextField("instagram.com/reel/… or tiktok.com/@you/video/…", text: $text)
+            TextField("or type the link", text: $text)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .keyboardType(.URL)
@@ -84,12 +160,6 @@ struct EmbedLinkView: View {
                     .labelStyle(.iconOnly)
                     .foregroundStyle(Palette.textTertiary)
             }
-            PasteButton(payloadType: String.self) { strings in
-                if let first = strings.first { text = first }
-            }
-            .labelStyle(.iconOnly)
-            .buttonBorderShape(.capsule)
-            .tint(Palette.violet)
         }
         .padding(14)
         .background(Palette.surface, in: .rect(cornerRadius: 16))
@@ -99,19 +169,27 @@ struct EmbedLinkView: View {
     @ViewBuilder
     private var status: some View {
         if let link {
-            Label("\(link.platform.name) video found", systemImage: "checkmark.circle.fill")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Palette.mint)
-                .accessibilityIdentifier("embed.found")
+            HStack(spacing: 8) {
+                PlatformGlyph(platform: link.platform, size: 22)
+                Text(foundText(for: link))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Palette.mint)
+                    .accessibilityIdentifier("embed.found")
+            }
         } else if isExpanding {
             Label("Opening the share link…", systemImage: "hourglass")
                 .font(.subheadline)
                 .foregroundStyle(Palette.textSecondary)
         } else if !text.trimmingCharacters(in: .whitespaces).isEmpty {
-            Label("Use a link to a single public post on Instagram or TikTok.", systemImage: "info.circle")
+            Label("That isn't a link to a single public Instagram post or TikTok video.", systemImage: "info.circle")
                 .font(.subheadline)
                 .foregroundStyle(Palette.amber)
         }
+    }
+
+    private func foundText(for link: EmbedLink) -> String {
+        guard let posted = link.postDate else { return "\(link.platform.name) video found" }
+        return "\(link.platform.name) video found · \(Recency.label(posted, verb: "posted").lowercased())"
     }
 
     private var storyNotice: some View {
@@ -137,13 +215,31 @@ struct EmbedLinkView: View {
         .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Palette.pink.opacity(0.35)))
     }
 
+    private func tooOldNotice(_ date: Date) -> some View {
+        Label {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("That one's from \(date.formatted(.dateTime.month(.wide).year()))")
+                    .font(.glimpseHeadline)
+                Text("Glimpse shows the real, current you, so linked posts need to be from the last 12 months. Pick a newer one, or upload a recent clip.")
+                    .font(.subheadline)
+                    .foregroundStyle(Palette.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        } icon: {
+            Image(systemName: "calendar.badge.exclamationmark").foregroundStyle(Palette.amber)
+        }
+        .padding(14)
+        .background(Palette.amber.opacity(0.08), in: .rect(cornerRadius: 16))
+        .accessibilityIdentifier("embed.tooOld")
+    }
+
     private func disclosure(for link: EmbedLink) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Label {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("This links to your \(link.platform.name)")
                         .font(.glimpseHeadline)
-                    Text("Anyone who taps this video can open it in \(link.platform.name), where your username, profile and other posts are visible. Glimpse never shows your handle anywhere else. If the post is deleted, made private or expires, we hide it and let you know.")
+                    Text("Anyone who taps this video can open it in \(link.platform.name), where your username, profile and other posts are visible. Glimpse never shows your handle anywhere else. If the post is deleted, made private or expires, we hide it.")
                         .font(.subheadline)
                         .foregroundStyle(Palette.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -160,6 +256,8 @@ struct EmbedLinkView: View {
         .background(Palette.amber.opacity(0.08), in: .rect(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Palette.amber.opacity(0.35)))
     }
+
+    // MARK: Actions
 
     private func resolve() async {
         errorMessage = nil
@@ -187,6 +285,102 @@ struct EmbedLinkView: View {
             onAdded(video)
         } catch {
             errorMessage = GlimpseError.describe(error)
+        }
+    }
+}
+
+private struct StepHeader: View {
+    let number: Int
+    let title: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text("\(number)")
+                .font(.subheadline.weight(.heavy))
+                .foregroundStyle(Palette.onMint)
+                .frame(width: 26, height: 26)
+                .background(Palette.mint, in: .circle)
+            Text(title)
+                .font(.glimpseHeadline)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+}
+
+private struct InstructionRow: View {
+    let index: String
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(index)
+                .font(.caption.weight(.heavy))
+                .foregroundStyle(Palette.textSecondary)
+                .frame(width: 18)
+            Text(text)
+                .font(.subheadline)
+                .foregroundStyle(Palette.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+private struct PlatformChoice: View {
+    let platform: EmbedLink.Platform
+    let detail: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 10) {
+                PlatformGlyph(platform: platform, size: 48)
+                VStack(spacing: 2) {
+                    Text(platform.name).font(.glimpseHeadline).foregroundStyle(Palette.textPrimary)
+                    Text(detail).font(.caption).foregroundStyle(Palette.textSecondary)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(Palette.surface, in: .rect(cornerRadius: 18))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(isSelected ? Palette.mint : Palette.stroke, lineWidth: isSelected ? 2 : 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(platform.name)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier("embed.platform.\(platform.rawValue)")
+    }
+}
+
+/// The platform's mark, drawn in its brand colors (a recognisable stand-in; the
+/// app ships no third-party logos).
+struct PlatformGlyph: View {
+    let platform: EmbedLink.Platform
+    var size: CGFloat = 32
+
+    var body: some View {
+        Image(systemName: platform == .instagram ? "camera" : "music.note")
+            .font(.system(size: size * 0.5, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: size, height: size)
+            .background(background, in: .rect(cornerRadius: size * 0.28))
+            .shadow(color: platform == .tiktok ? Color(hex: 0xFE2C55).opacity(0.5) : Color(hex: 0xDD2A7B).opacity(0.4), radius: 4, x: platform == .tiktok ? 1.5 : 0, y: platform == .tiktok ? 1.5 : 1)
+            .accessibilityHidden(true)
+    }
+
+    private var background: some ShapeStyle {
+        switch platform {
+        case .instagram:
+            LinearGradient(
+                colors: [Color(hex: 0xFEDA75), Color(hex: 0xFA7E1E), Color(hex: 0xD62976), Color(hex: 0x962FBF), Color(hex: 0x4F5BD5)],
+                startPoint: .bottomLeading, endPoint: .topTrailing
+            )
+        case .tiktok:
+            LinearGradient(colors: [Color(hex: 0x010101), Color(hex: 0x1F1F1F)], startPoint: .top, endPoint: .bottom)
         }
     }
 }

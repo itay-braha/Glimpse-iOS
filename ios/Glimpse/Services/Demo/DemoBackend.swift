@@ -169,13 +169,14 @@ actor DemoBackend: GlimpseBackend {
 
     func uploadClip(_ clip: RecordedClip) async throws -> ProfileVideo {
         try await Task.sleep(for: .milliseconds(600))
+        if let filmed = clip.capturedAt, Recency.isTooOldToAdd(filmed) { throw GlimpseError.clipTooOld }
         let video = ProfileVideo(
             id: UUID(),
             source: clip.source,
             storagePath: clip.fileURL.absoluteString,
             thumbnailPath: nil,
             durationSeconds: clip.durationSeconds,
-            capturedAt: .now,
+            capturedAt: clip.source == .upload ? min(clip.capturedAt ?? .now, .now) : .now,
             importedAt: .now,
             promptKey: clip.promptKey
         )
@@ -196,6 +197,7 @@ actor DemoBackend: GlimpseBackend {
         try await Task.sleep(for: .milliseconds(500))
         if EmbedLink.isStory(link.canonicalURL.absoluteString) { throw GlimpseError.storyLink }
         guard videos.contains(where: { !$0.isEmbed }) else { throw GlimpseError.hostedFirst }
+        if let posted = link.postDate, Recency.isTooOldToAdd(posted) { throw GlimpseError.clipTooOld }
         if videos.contains(where: { $0.source == link.platform.source && $0.embedURL == link.canonicalURL }) {
             throw GlimpseError.videoAlreadyAdded
         }
@@ -206,7 +208,7 @@ actor DemoBackend: GlimpseBackend {
             storagePath: nil,
             embedURL: link.canonicalURL,
             durationSeconds: nil,
-            capturedAt: .now,
+            capturedAt: link.postDate ?? .now,
             importedAt: .now,
             promptKey: promptKey
         )

@@ -51,7 +51,8 @@ struct UploadVideoView: View {
                 .font(.glimpseTitle2)
             VStack(alignment: .leading, spacing: 12) {
                 RequirementRow(symbol: "film", text: "MP4 or MOV")
-                RequirementRow(symbol: "timer", text: "Up to 15 seconds. Longer clips are trimmed to the first 15.")
+                RequirementRow(symbol: "timer", text: "7 seconds is the sweet spot; up to 15. Longer clips are trimmed to the first 15.")
+                RequirementRow(symbol: "calendar", text: "Filmed in the last 12 months.")
                 RequirementRow(symbol: "externaldrive", text: "Up to 20 MB. We compress it on your phone first.")
                 RequirementRow(symbol: "rectangle.portrait", text: "Vertical (9:16) fills the screen best.")
             }
@@ -96,6 +97,16 @@ struct UploadVideoView: View {
                 } else {
                     CheckRow(state: .ok, text: "\(max(seconds, 1))s, within 15 seconds")
                 }
+                if let filmed = review.inspection.filmedAt {
+                    if Recency.isTooOldToAdd(filmed) {
+                        CheckRow(state: .blocked, text: "Filmed \(filmed.formatted(.dateTime.month(.wide).year())). Clips need to be from the last 12 months.")
+                    } else {
+                        CheckRow(state: .ok, text: Recency.label(filmed, verb: "Filmed"))
+                    }
+                }
+                if review.inspection.durationSeconds > PlaybackPreferences.defaultClipSeconds + 0.5 {
+                    CheckRow(state: .note, text: "People see the first 7 seconds; the rest is a tap away.")
+                }
                 if review.inspection.isVertical {
                     CheckRow(state: .ok, text: "Vertical, fills the screen")
                 } else {
@@ -135,6 +146,7 @@ struct UploadVideoView: View {
                     }
                 }
                 .buttonStyle(.glimpse)
+                .disabled(review.inspection.filmedAt.map { Recency.isTooOldToAdd($0) } ?? false)
                 .accessibilityIdentifier("upload.add")
             }
         }
@@ -202,7 +214,8 @@ final class UploadVideoModel {
             let (downloaded, _) = try await URLSession.shared.download(from: remote)
             let local = FileManager.default.temporaryDirectory.appending(path: "sample-\(UUID().uuidString).mp4")
             try FileManager.default.moveItem(at: downloaded, to: local)
-            try await inspect(local)
+            // The sample's file date is meaningless; treat it as filmed now.
+            try await inspect(local, keepFilmedDate: false)
         } catch {
             errorMessage = GlimpseError.describe(error)
             state = .idle
@@ -214,7 +227,7 @@ final class UploadVideoModel {
         errorMessage = nil
         state = .uploading
         do {
-            var clip = try await VideoCompressor.prepare(review.fileURL, source: .upload)
+            var clip = try await VideoCompressor.prepare(review.fileURL, source: .upload, filmedAt: review.inspection.filmedAt)
             clip.promptKey = prompt?.rawValue
             return try await backend.uploadClip(clip)
         } catch {
@@ -224,8 +237,9 @@ final class UploadVideoModel {
         }
     }
 
-    private func inspect(_ url: URL) async throws {
-        let inspection = try await VideoCompressor.inspect(url)
+    private func inspect(_ url: URL, keepFilmedDate: Bool = true) async throws {
+        var inspection = try await VideoCompressor.inspect(url)
+        if !keepFilmedDate { inspection.filmedAt = nil }
         state = .review(Review(fileURL: url, inspection: inspection))
     }
 }
@@ -262,17 +276,34 @@ private struct CheckRow: View {
     enum Kind {
         case ok
         case note
+        case blocked
     }
 
     let state: Kind
     let text: String
 
+    private var symbolName: String {
+        switch state {
+        case .ok: "checkmark.circle.fill"
+        case .note: "info.circle.fill"
+        case .blocked: "xmark.circle.fill"
+        }
+    }
+
+    private var tint: Color {
+        switch state {
+        case .ok: Palette.mint
+        case .note: Palette.amber
+        case .blocked: Palette.pink
+        }
+    }
+
     var body: some View {
         Label {
             Text(text).foregroundStyle(Palette.textPrimary)
         } icon: {
-            Image(systemName: state == .ok ? "checkmark.circle.fill" : "info.circle.fill")
-                .foregroundStyle(state == .ok ? Palette.mint : Palette.amber)
+            Image(systemName: symbolName)
+                .foregroundStyle(tint)
         }
         .font(.subheadline)
     }

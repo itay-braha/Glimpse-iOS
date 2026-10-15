@@ -68,6 +68,33 @@ struct EmbedLink: Equatable, Sendable {
         return nil
     }
 
+    /// When the post was published, read from its id (nil if it can't be read).
+    /// TikTok: the upper 32 bits of the video id are Unix seconds. Instagram: the
+    /// 11-character shortcode is the media id in base64url, whose upper bits are
+    /// milliseconds since Instagram's epoch. Mirrors `private.post_time_from_id`.
+    var postDate: Date? {
+        let date: Date
+        switch platform {
+        case .tiktok:
+            guard let id = UInt64(postID) else { return nil }
+            date = Date(timeIntervalSince1970: TimeInterval(id >> 32))
+        case .instagram:
+            let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
+            guard postID.count == 11 else { return nil }
+            var id: UInt64 = 0
+            for character in postID {
+                guard let digit = alphabet.firstIndex(of: character) else { return nil }
+                let (shifted, overflow) = id.multipliedReportingOverflow(by: 64)
+                guard !overflow else { return nil }
+                id = shifted + UInt64(digit)
+            }
+            date = Date(timeIntervalSince1970: (Double(id >> 23) + 1_314_220_021_721) / 1000)
+        }
+        let earliest = Date(timeIntervalSince1970: 1_285_891_200) // Oct 2010
+        guard date >= earliest, date <= Date.now.addingTimeInterval(86_400) else { return nil }
+        return date
+    }
+
     /// Instagram Stories and Highlights: Instagram can't embed them and Stories
     /// expire after 24 hours, so they're uploaded instead (Glimpse keeps a copy).
     static func isStory(_ raw: String) -> Bool {

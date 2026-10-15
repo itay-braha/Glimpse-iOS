@@ -40,13 +40,19 @@ struct VideoHubOptions: View {
                 .accessibilityIdentifier("hub.upload")
 
             VideoSourceCard(
-                symbol: "link",
-                tint: Palette.pink,
-                title: "Link a public Reel or TikTok",
+                title: "Link from Instagram or TikTok",
                 detail: canLink
-                    ? "Already posted something great? It plays right on your profile."
-                    : "Unlocks after your first clip. Links sit on top of a clip of your own."
-            ) { onSelect(.embed) }
+                    ? "A public Reel or TikTok from the last year. We'll walk you through it."
+                    : "Unlocks after your first clip. Links sit on top of a clip of your own.",
+                action: { onSelect(.embed) }
+            ) {
+                ZStack {
+                    PlatformGlyph(platform: .instagram, size: 34)
+                        .offset(x: -7, y: -7)
+                    PlatformGlyph(platform: .tiktok, size: 34)
+                        .offset(x: 8, y: 8)
+                }
+            }
                 .disabled(!canLink)
                 .accessibilityIdentifier("hub.embed")
 

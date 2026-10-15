@@ -14,6 +14,8 @@ enum VideoCompressor {
         let durationSeconds: Double
         /// Display size after the track's rotation is applied.
         let size: CGSize
+        /// When it was filmed, from the file's metadata (nil when the file doesn't say).
+        var filmedAt: Date?
 
         var isPortrait: Bool { size.height > size.width }
         /// 9:16 give or take (covers 3:4-ish phone crops too).
@@ -29,10 +31,18 @@ enum VideoCompressor {
         }
         let (natural, transform) = try await track.load(.naturalSize, .preferredTransform)
         let rect = CGRect(origin: .zero, size: natural).applying(transform)
-        return Inspection(durationSeconds: duration, size: CGSize(width: abs(rect.width), height: abs(rect.height)))
+        var filmedAt: Date?
+        if let item = try? await asset.load(.creationDate) {
+            filmedAt = try? await item.load(.dateValue)
+        }
+        return Inspection(
+            durationSeconds: duration,
+            size: CGSize(width: abs(rect.width), height: abs(rect.height)),
+            filmedAt: filmedAt
+        )
     }
 
-    static func prepare(_ sourceURL: URL, source: VideoSource = .native) async throws -> RecordedClip {
+    static func prepare(_ sourceURL: URL, source: VideoSource = .native, filmedAt: Date? = nil) async throws -> RecordedClip {
         let asset = AVURLAsset(url: sourceURL)
         let duration = try await asset.load(.duration).seconds
         let kept = min(duration, maxDuration)
@@ -58,7 +68,8 @@ enum VideoCompressor {
             durationSeconds: kept,
             thumbnailJPEG: await thumbnail(for: AVURLAsset(url: exportedURL)),
             source: source,
-            byteCount: bytes
+            byteCount: bytes,
+            capturedAt: filmedAt
         )
     }
 

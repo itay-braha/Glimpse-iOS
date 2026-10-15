@@ -49,23 +49,26 @@ struct FirstVideoView: View {
     }
 }
 
-struct VideoSourceCard: View {
-    let symbol: String
-    let tint: Color
+struct VideoSourceCard<Icon: View>: View {
     let title: String
     let detail: String
     let action: () -> Void
+    let icon: Icon
 
     @Environment(\.isEnabled) private var isEnabled
+
+    init(title: String, detail: String, action: @escaping () -> Void, @ViewBuilder icon: () -> Icon) {
+        self.title = title
+        self.detail = detail
+        self.action = action
+        self.icon = icon()
+    }
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 16) {
-                Image(systemName: symbol)
-                    .font(.title2)
-                    .foregroundStyle(tint)
+                icon
                     .frame(width: 48, height: 48)
-                    .background(tint.opacity(0.14), in: .rect(cornerRadius: 14))
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title).font(.glimpseHeadline).foregroundStyle(Palette.textPrimary)
                     Text(detail).font(.subheadline).foregroundStyle(Palette.textSecondary)
@@ -81,5 +84,26 @@ struct VideoSourceCard: View {
             .opacity(isEnabled ? 1 : 0.45)
         }
         .buttonStyle(.plain)
+    }
+}
+
+extension VideoSourceCard where Icon == SourceSymbol {
+    init(symbol: String, tint: Color, title: String, detail: String, action: @escaping () -> Void) {
+        self.init(title: title, detail: detail, action: action) {
+            SourceSymbol(symbol: symbol, tint: tint)
+        }
+    }
+}
+
+struct SourceSymbol: View {
+    let symbol: String
+    let tint: Color
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.title2)
+            .foregroundStyle(tint)
+            .frame(width: 48, height: 48)
+            .background(tint.opacity(0.14), in: .rect(cornerRadius: 14))
     }
 }

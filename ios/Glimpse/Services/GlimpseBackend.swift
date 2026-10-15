@@ -111,4 +111,6 @@ struct RecordedClip: Sendable {
     /// `.native` from the camera, `.upload` from the camera roll.
     var source: VideoSource = .native
     var byteCount: Int?
+    /// When it was filmed, from the file's metadata (uploads); nil = now.
+    var capturedAt: Date?
 }

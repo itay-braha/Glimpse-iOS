@@ -92,7 +92,11 @@ struct RecorderView: View {
             HStack {
                 Spacer().frame(width: 56)
                 Spacer()
-                RecordButton(startedAt: recordingStart, maxDuration: model.purpose.maxDuration) {
+                RecordButton(
+                    startedAt: recordingStart,
+                    maxDuration: model.purpose.maxDuration,
+                    sweetSpot: model.purpose == .profileClip ? PlaybackPreferences.defaultClipSeconds : nil
+                ) {
                     model.toggleRecording()
                 }
                 Spacer()
@@ -204,6 +208,8 @@ private struct PromptPicker: View {
 private struct RecordButton: View {
     let startedAt: Date?
     let maxDuration: Double
+    /// Marked on the ring (7 s for profile clips): what people see before "+more".
+    var sweetSpot: Double?
     let action: () -> Void
 
     var body: some View {
@@ -218,6 +224,13 @@ private struct RecordButton: View {
                         .trim(from: 0, to: progress)
                         .stroke(Palette.pink, style: StrokeStyle(lineWidth: 6, lineCap: .round))
                         .rotationEffect(.degrees(-90))
+                    if let sweetSpot {
+                        let fraction = min(sweetSpot / maxDuration, 1)
+                        Circle()
+                            .trim(from: max(fraction - 0.008, 0), to: fraction + 0.008)
+                            .stroke(Palette.mint, style: StrokeStyle(lineWidth: 10, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
+                    }
                     RoundedRectangle(cornerRadius: startedAt == nil ? 32 : 8)
                         .fill(Palette.pink)
                         .frame(width: startedAt == nil ? 62 : 30, height: startedAt == nil ? 62 : 30)

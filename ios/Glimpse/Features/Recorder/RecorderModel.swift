@@ -15,7 +15,7 @@ enum RecordingPurpose: Equatable {
 
     var prompt: String {
         switch self {
-        case .profileClip: "Up to 15 seconds. Be yourself."
+        case .profileClip: "Aim for 7 seconds (up to 15). Be yourself."
         case let .verification(challenge): challenge.gesture
         }
     }
