@@ -36,6 +36,8 @@ shoot 07-liked-you 8 -screen likes
 shoot 08-paywall 6 -screen paywall
 shoot 09-settings 7 -screen settings
 shoot 10-vibe-check 8 -screen chat
+shoot 12-video-hub 6 -screen firstVideo
+shoot 13-add-video 7 -screen addVideo
 
 # A short screen recording of the feed playing video.
 record() {

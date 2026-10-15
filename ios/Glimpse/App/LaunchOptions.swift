@@ -13,6 +13,10 @@ struct LaunchOptions: Sendable {
         case likes
         case paywall
         case settings
+        /// Profile with the "Let others get a Glimpse of YOU" sheet open.
+        case addVideo
+        /// Onboarding's last step (the video hub) for a signed-in member with no videos.
+        case firstVideo
     }
 
     var forceDemo = false

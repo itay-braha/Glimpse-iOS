@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The mandatory "Imported N days ago" tag shown on every video.
+/// The mandatory "Added N days ago" tag shown on every video.
 struct RecencyBadge: View {
     let video: ProfileVideo
     var now: Date = .now

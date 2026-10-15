@@ -7,8 +7,10 @@ struct RecorderView: View {
 
     let onSaved: (ProfileVideo?) -> Void
 
-    init(purpose: RecordingPurpose = .profileClip, onSaved: @escaping (ProfileVideo?) -> Void) {
-        _model = State(initialValue: RecorderModel(purpose: purpose))
+    init(purpose: RecordingPurpose = .profileClip, prompt: VibePrompt? = nil, onSaved: @escaping (ProfileVideo?) -> Void) {
+        let model = RecorderModel(purpose: purpose)
+        model.selectedPrompt = prompt
+        _model = State(initialValue: model)
         self.onSaved = onSaved
     }
 
@@ -61,6 +63,23 @@ struct RecorderView: View {
 
     private var captureControls: some View {
         VStack {
+            if model.purpose == .profileClip, let prompt = model.selectedPrompt {
+                // Inspiration prompt stays visible while recording, as a cue.
+                VStack(spacing: 6) {
+                    Text("\(prompt.emoji) \(prompt.text)")
+                        .font(.glimpseTitle2)
+                    Text(prompt.idea)
+                        .font(.subheadline)
+                        .opacity(isRecording ? 0 : 0.85)
+                }
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+                .background(.ultraThinMaterial, in: .rect(cornerRadius: 20))
+                .padding(.top, 76)
+                .padding(.horizontal, 24)
+            }
             Spacer()
             Text(model.purpose.prompt)
                 .multilineTextAlignment(.center)

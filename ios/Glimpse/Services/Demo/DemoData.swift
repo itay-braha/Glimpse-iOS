@@ -32,6 +32,24 @@ enum DemoData {
         )
     }
 
+    /// A linked public post. Demo builds render a stand-in instead of calling the platform.
+    static func embed(_ n: Int, platform: EmbedLink.Platform, importedDaysAgo: Double, now: Date = .now) -> ProfileVideo {
+        let url = switch platform {
+        case .instagram: "https://www.instagram.com/reel/GlimpseDemo\(n)/"
+        case .tiktok: "https://www.tiktok.com/@glimpse.demo/video/73000000000000\(n)"
+        }
+        return ProfileVideo(
+            id: id(10_000 + n),
+            source: platform.source,
+            videoType: .embed,
+            storagePath: nil,
+            embedURL: URL(string: url),
+            durationSeconds: nil,
+            capturedAt: daysAgo(importedDaysAgo, from: now),
+            importedAt: daysAgo(importedDaysAgo, from: now)
+        )
+    }
+
     static func myProfile() -> UserProfile {
         UserProfile(
             id: meID,
@@ -52,9 +70,10 @@ enum DemoData {
 
     static func myVideos(now: Date = .now) -> [ProfileVideo] {
         [
-            video(1, source: .instagram, importedDaysAgo: 3, now: now),
+            video(1, source: .upload, importedDaysAgo: 3, now: now),
             video(2, source: .native, importedDaysAgo: 12, now: now),
-            video(3, source: .tiktok, importedDaysAgo: 104, now: now),
+            embed(90, platform: .instagram, importedDaysAgo: 20, now: now),
+            video(4, source: .upload, importedDaysAgo: 104, now: now),
         ]
     }
 
@@ -80,9 +99,9 @@ enum DemoData {
                 isVerified: index.isMultiple(of: 3),
                 distanceKm: 2 + (index * 7) % 23,
                 videos: [
-                    video(index * 2, source: index.isMultiple(of: 3) ? .native : .instagram, importedDaysAgo: Double(index % 5) + 1, now: now),
-                    video(index * 2 + 1, source: index.isMultiple(of: 2) ? .tiktok : .instagram, importedDaysAgo: Double(index % 4) * 6 + 9, now: now),
-                ]
+                    video(index * 2, source: index.isMultiple(of: 3) ? .native : .upload, importedDaysAgo: Double(index % 5) + 1, now: now),
+                    video(index * 2 + 1, source: index.isMultiple(of: 2) ? .upload : .native, importedDaysAgo: Double(index % 4) * 6 + 9, now: now),
+                ] + (index == 0 ? [embed(91, platform: .tiktok, importedDaysAgo: 6, now: now)] : [])
             )
         }
     }
@@ -106,7 +125,7 @@ enum DemoData {
                 bio: person.3,
                 isVerified: index.isMultiple(of: 2),
                 distanceKm: 1 + (index * 5) % 17,
-                videos: [video(20 + index, source: .instagram, importedDaysAgo: Double(index) + 2, now: now)]
+                videos: [video(20 + index, source: .upload, importedDaysAgo: Double(index) + 2, now: now)]
             )
         }
     }

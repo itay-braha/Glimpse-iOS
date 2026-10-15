@@ -1,6 +1,6 @@
 import Foundation
 
-/// Verified recency tags ("Imported 3 days ago") and the 90-day rotation rule.
+/// Verified recency tags ("Added 3 days ago") and the 90-day rotation rule.
 enum Recency {
     static let rotationThresholdDays = 90
 
@@ -15,11 +15,11 @@ enum Recency {
     static func label(_ importedAt: Date, now: Date = .now) -> String {
         let days = days(since: importedAt, now: now)
         switch days {
-        case 0: return "Imported today"
-        case 1: return "Imported yesterday"
-        case 2..<14: return "Imported \(days) days ago"
-        case 14..<60: return "Imported \(days / 7) weeks ago"
-        default: return "Imported \(days / 30) months ago"
+        case 0: return "Added today"
+        case 1: return "Added yesterday"
+        case 2..<14: return "Added \(days) days ago"
+        case 14..<60: return "Added \(days / 7) weeks ago"
+        default: return "Added \(days / 30) months ago"
         }
     }
 

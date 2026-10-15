@@ -8,7 +8,6 @@ final class ProfileModel {
 
     private(set) var videos: [ProfileVideo] = []
     private(set) var mediaURLs: [String: URL] = [:]
-    private(set) var isImporting = false
     var errorMessage: String?
 
     var staleVideos: [ProfileVideo] { videos.filter { Recency.isStale($0.importedAt) } }
@@ -65,22 +64,6 @@ final class ProfileModel {
             try await backend.reorderVideos(videos.map(\.id))
         } catch {
             videos = previous
-            errorMessage = GlimpseError.describe(error)
-        }
-    }
-
-    func importInstagram(using backend: any GlimpseBackend, config: AppConfig?) async {
-        isImporting = true
-        defer { isImporting = false }
-        do {
-            let imported = try await InstagramImporter.run(backend: backend, config: config)
-            if imported.isEmpty {
-                errorMessage = "No Reels from the last 90 days were found."
-            }
-            await load(using: backend)
-        } catch InstagramImporter.Failure.cancelled {
-            return
-        } catch {
             errorMessage = GlimpseError.describe(error)
         }
     }

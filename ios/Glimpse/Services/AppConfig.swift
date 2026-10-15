@@ -4,11 +4,6 @@ import Foundation
 struct AppConfig: Sendable {
     let supabaseURL: URL
     let supabaseKey: String
-    let instagramAppID: String?
-
-    var instagramRedirectURI: String {
-        supabaseURL.appending(path: "functions/v1/social-import/callback").absoluteString
-    }
 
     /// `nil` when the build has no Supabase project configured (demo mode).
     static func load(from bundle: Bundle = .main) -> AppConfig? {
@@ -23,6 +18,6 @@ struct AppConfig: Sendable {
               let url = URL(string: "https://\(host)")
         else { return nil }
 
-        return AppConfig(supabaseURL: url, supabaseKey: key, instagramAppID: value("GlimpseInstagramAppID"))
+        return AppConfig(supabaseURL: url, supabaseKey: key)
     }
 }

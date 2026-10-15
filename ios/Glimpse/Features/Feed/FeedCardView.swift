@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// One full-screen profile: looping video, story-style segments for multiple
-/// clips, verified recency tag and a TikTok-style action rail.
+/// One full-screen profile: looping video (muted until the viewer unmutes), or a
+/// linked Instagram/TikTok post in the platform's own player; story-style
+/// segments for multiple clips, verified recency tag and a TikTok-style action rail.
 struct FeedCardView: View {
     let profile: FeedProfile
     let playableURLs: [String: URL]
@@ -15,6 +16,7 @@ struct FeedCardView: View {
     @State private var videoIndex = 0
     @State private var burstID = 0
     @State private var showMeMarker = false
+    @State private var preferences = PlaybackPreferences.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var video: ProfileVideo? {
@@ -25,8 +27,8 @@ struct FeedCardView: View {
         ZStack {
             poster
 
-            if let video, let url = playableURLs[video.storagePath] {
-                LoopingVideoPlayer(url: url, isActive: isActive)
+            if let video, let path = video.storagePath, let url = playableURLs[path] {
+                LoopingVideoPlayer(url: url, isActive: isActive, isMuted: preferences.isMuted)
                     .id(video.id)
                     .allowsHitTesting(false)
             }
@@ -44,8 +46,19 @@ struct FeedCardView: View {
                 Spacer()
                 GradientScrim(edge: .bottom, height: 480, strength: 0.9)
             }
+            .allowsHitTesting(false)
 
             gestureLayer
+
+            if let link = video?.embedLink {
+                // Linked post: framed above the name block so the platform's own
+                // player and captions stay readable and tappable.
+                EmbedStage(link: link, isActive: isActive)
+                    .id(video?.id)
+                    .padding(.top, insets.top + (profile.videos.count > 1 ? 78 : 64))
+                    .padding(.horizontal, 30)
+                    .padding(.bottom, insets.bottom + 240)
+            }
 
             VStack(spacing: 0) {
                 if profile.videos.count > 1 {
@@ -80,6 +93,8 @@ struct FeedCardView: View {
         .accessibilityElement(children: .contain)
         .accessibilityAction(named: "Like") { like() }
         .accessibilityAction(named: "Pass", onPass)
+        .accessibilityAction(named: "Next clip") { step(1) }
+        .accessibilityAction(named: "Previous clip") { step(-1) }
     }
 
     private var poster: some View {
@@ -92,16 +107,23 @@ struct FeedCardView: View {
         .accessibilityHidden(true)
     }
 
+    /// Tap left/right halves to step between clips, double-tap to like. Over an
+    /// embed only the side gutters do this; the middle belongs to the player.
     private var gestureLayer: some View {
         HStack(spacing: 0) {
             Color.clear
                 .contentShape(.rect)
                 .onTapGesture(count: 2) { like() }
                 .onTapGesture { step(-1) }
+                .frame(maxWidth: video?.isEmbed == true ? 30 : .infinity)
+            if video?.isEmbed == true {
+                Spacer()
+            }
             Color.clear
                 .contentShape(.rect)
                 .onTapGesture(count: 2) { like() }
                 .onTapGesture { step(1) }
+                .frame(maxWidth: video?.isEmbed == true ? 30 : .infinity)
         }
         .accessibilityHidden(true)
     }
@@ -161,6 +183,9 @@ struct FeedCardView: View {
 
     private var actionRail: some View {
         VStack(spacing: 22) {
+            if video?.isEmbed == false {
+                MuteToggle()
+            }
             RailButton(
                 title: isLiked ? "Liked" : "Glimpse",
                 symbol: "heart.fill",

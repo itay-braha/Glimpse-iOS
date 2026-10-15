@@ -10,11 +10,11 @@ struct RecencyTests {
     }
 
     @Test(arguments: [
-        (0.2, "Imported today"),
-        (1.5, "Imported yesterday"),
-        (3.2, "Imported 3 days ago"),
-        (21, "Imported 3 weeks ago"),
-        (95, "Imported 3 months ago"),
+        (0.2, "Added today"),
+        (1.5, "Added yesterday"),
+        (3.2, "Added 3 days ago"),
+        (21, "Added 3 weeks ago"),
+        (95, "Added 3 months ago"),
     ])
     func labels(days: Double, expected: String) {
         #expect(Recency.label(daysAgo(days), now: now) == expected)

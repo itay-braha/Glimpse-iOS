@@ -7,7 +7,11 @@ enum GlimpseError: LocalizedError, Equatable {
     case deviceBlocked
     case deviceUnverified
     case cameraUnavailable
-    case instagramNotConfigured
+    /// Not a public Instagram post/Reel or TikTok video.
+    case invalidEmbedLink
+    case videoAlreadyAdded
+    /// Over the 20 MB upload cap even after compression.
+    case videoTooLarge
     /// Free daily likes are used up (Glimpse+ or waiting lifts it).
     case outOfLikes
     /// The free daily "who liked you" reveal is used up.
@@ -31,7 +35,9 @@ enum GlimpseError: LocalizedError, Equatable {
         case .deviceBlocked: "This device can't be used for Glimpse."
         case .deviceUnverified: "We couldn't verify this device. Try again on a real iPhone."
         case .cameraUnavailable: "The camera isn't available on this device."
-        case .instagramNotConfigured: "Instagram import isn't set up for this build yet."
+        case .invalidEmbedLink: "That link isn't a public Instagram post or Reel, or a TikTok video."
+        case .videoAlreadyAdded: "That video is already on your profile."
+        case .videoTooLarge: "That video is over 20 MB. Try a shorter clip."
         case .outOfLikes: "You're out of likes for now."
         case .revealLimit: "Your free reveal comes back tomorrow."
         case .rateLimited: "Whoa, slow down a little. Try again in a minute."

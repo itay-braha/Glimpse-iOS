@@ -74,7 +74,6 @@ targets:
             CFBundleURLSchemes: [glimpse]
         GlimpseSupabaseHost: $(SUPABASE_PROJECT_HOST)
         GlimpseSupabaseKey: $(SUPABASE_PUBLISHABLE_KEY)
-        GlimpseInstagramAppID: $(INSTAGRAM_APP_ID)
 
   GlimpseTests:
     type: bundle.unit-test

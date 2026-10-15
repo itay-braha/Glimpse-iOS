@@ -1,82 +1,46 @@
 import SwiftUI
 
-/// Glimpse profiles are video-only, so onboarding ends with the first moment.
+/// Glimpse profiles are video-only, so onboarding ends with the first moment:
+/// the "Let others get a Glimpse of YOU" hub.
 struct FirstVideoView: View {
     @Environment(AppModel.self) private var app
-    @State private var showRecorder = false
-    @State private var isImporting = false
-    @State private var errorMessage: String?
+    @State private var route: AddVideoRoute?
 
     var body: some View {
-        OnboardingScaffold(
-            title: "Add your first moment",
-            subtitle: "No studio shots. Pull a recent Reel or record 15 seconds of you being you. Every clip shows when it was added, so profiles stay current."
-        ) {
-            VideoSourceCard(
-                symbol: "camera.aperture",
-                tint: Palette.pink,
-                title: "Import from Instagram",
-                detail: "Your recent Reels, from the last 90 days."
-            ) {
-                Task { await importFromInstagram() }
-            }
-            .disabled(isImporting)
-
-            VideoSourceCard(
-                symbol: "music.note",
-                tint: Color(hex: 0x7AF0FF),
-                title: "Import from TikTok",
-                detail: "Coming soon"
-            ) {}
-            .disabled(true)
-
-            VideoSourceCard(
-                symbol: "record.circle",
-                tint: Palette.mint,
-                title: "Record a clip",
-                detail: "Up to 15 seconds, right here."
-            ) {
-                showRecorder = true
-            }
-
-            if isImporting {
-                HStack(spacing: 10) {
-                    ProgressView()
-                    Text("Importing your Reels…").foregroundStyle(Palette.textSecondary)
+        VStack(alignment: .leading, spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 26) {
+                    GlimpseOfYouHeader()
+                    VideoHubOptions { route = $0 }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 8)
             }
+            .scrollBounceBehavior(.basedOnSize)
 
-            if let errorMessage {
-                ErrorText(errorMessage)
-            }
-        } footer: {
             Button("Sign out") {
                 Task { await app.signOut() }
             }
             .font(.subheadline)
             .foregroundStyle(Palette.textTertiary)
             .frame(maxWidth: .infinity)
+            .padding(.top, 12)
         }
-        .fullScreenCover(isPresented: $showRecorder) {
-            RecorderView { _ in
-                Task { await app.refreshProfile() }
+        .padding(.horizontal, 24)
+        .padding(.bottom, 12)
+        .background(Palette.midnight.ignoresSafeArea())
+        .sheet(item: $route) { route in
+            NavigationStack {
+                AddVideoDestination(route: route) { _ in
+                    self.route = nil
+                    Task { await app.refreshProfile() }
+                }
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") { self.route = nil }
+                    }
+                }
             }
-        }
-    }
-
-    private func importFromInstagram() async {
-        isImporting = true
-        defer { isImporting = false }
-        do {
-            let imported = try await InstagramImporter.run(backend: app.backend, config: app.config)
-            if imported.isEmpty {
-                errorMessage = "No Reels from the last 90 days were found. Try recording a clip instead."
-            }
-            await app.refreshProfile()
-        } catch InstagramImporter.Failure.cancelled {
-            return
-        } catch {
-            errorMessage = GlimpseError.describe(error)
         }
     }
 }

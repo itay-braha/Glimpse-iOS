@@ -39,10 +39,12 @@ actor DemoBackend: GlimpseBackend {
     private var immune: Set<UUID> = []
 
     /// - Parameter seeded: start signed in with a complete profile and 20 matches.
-    init(seeded: Bool = true, now: Date = .now) {
+    /// `withVideos: false` starts signed in but before the first moment (onboarding's video hub).
+    init(seeded: Bool = true, withVideos: Bool = true, now: Date = .now) {
         signedIn = seeded
         profile = seeded ? DemoData.myProfile() : nil
-        videos = seeded ? DemoData.myVideos(now: now) : []
+        videos = seeded && withVideos ? DemoData.myVideos(now: now) : []
+        if seeded && !withVideos { profile?.isOnboarded = false }
         candidates = DemoData.feed(now: now)
         matches = seeded ? DemoData.matches(now: now) : []
         let admirerList = DemoData.admirers(now: now)
@@ -168,7 +170,7 @@ actor DemoBackend: GlimpseBackend {
         try await Task.sleep(for: .milliseconds(600))
         let video = ProfileVideo(
             id: UUID(),
-            source: .native,
+            source: clip.source,
             storagePath: clip.fileURL.absoluteString,
             thumbnailPath: nil,
             durationSeconds: clip.durationSeconds,
@@ -186,12 +188,25 @@ actor DemoBackend: GlimpseBackend {
         profile?.isOnboarded = !videos.isEmpty
     }
 
-    func importInstagram(code: String) async throws -> [ProfileVideo] {
-        try await Task.sleep(for: .milliseconds(800))
-        let imported = DemoData.video(videos.count + 7, source: .instagram, importedDaysAgo: 0)
-        videos.insert(imported, at: 0)
+    func addEmbed(_ link: EmbedLink, promptKey: String?) async throws -> ProfileVideo {
+        try await Task.sleep(for: .milliseconds(500))
+        if videos.contains(where: { $0.source == link.platform.source && $0.embedURL == link.canonicalURL }) {
+            throw GlimpseError.videoAlreadyAdded
+        }
+        let video = ProfileVideo(
+            id: UUID(),
+            source: link.platform.source,
+            videoType: .embed,
+            storagePath: nil,
+            embedURL: link.canonicalURL,
+            durationSeconds: nil,
+            capturedAt: .now,
+            importedAt: .now,
+            promptKey: promptKey
+        )
+        videos.insert(video, at: 0)
         profile?.isOnboarded = true
-        return [imported]
+        return video
     }
 
     // MARK: Discovery

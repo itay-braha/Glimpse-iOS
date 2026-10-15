@@ -20,7 +20,8 @@ protocol GlimpseBackend: AnyObject, Sendable {
     func fetchMyVideos() async throws -> [ProfileVideo]
     func uploadClip(_ clip: RecordedClip) async throws -> ProfileVideo
     func deleteVideo(_ video: ProfileVideo) async throws
-    func importInstagram(code: String) async throws -> [ProfileVideo]
+    /// Links a public Instagram / TikTok post. The server validates and canonicalizes the URL.
+    func addEmbed(_ link: EmbedLink, promptKey: String?) async throws -> ProfileVideo
     /// Persists clip order; the first clip is the cover.
     func reorderVideos(_ ids: [UUID]) async throws
     func updateLocation(latitude: Double, longitude: Double) async throws
@@ -103,4 +104,7 @@ struct RecordedClip: Sendable {
     let durationSeconds: Double
     let thumbnailJPEG: Data?
     var promptKey: String?
+    /// `.native` from the camera, `.upload` from the camera roll.
+    var source: VideoSource = .native
+    var byteCount: Int?
 }

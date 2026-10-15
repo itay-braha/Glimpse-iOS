@@ -98,7 +98,7 @@ final class SupabaseBackend: GlimpseBackend {
 
     func uploadClip(_ clip: RecordedClip) async throws -> ProfileVideo {
         let owner = try currentUserKey()
-        let videoPath = try await upload(fileURL: clip.fileURL, kind: "profile", ext: "mp4")
+        let videoPath = try await upload(fileURL: clip.fileURL, kind: "profile", ext: "mp4", bytes: clip.byteCount)
 
         var thumbnailPath: String?
         if let jpeg = clip.thumbnailJPEG {
@@ -107,7 +107,7 @@ final class SupabaseBackend: GlimpseBackend {
 
         let row = NewVideoRow(
             userID: owner,
-            source: .native,
+            source: clip.source == .upload ? .upload : .native,
             storagePath: videoPath,
             thumbnailPath: thumbnailPath,
             durationSeconds: (clip.durationSeconds * 100).rounded() / 100,
@@ -126,10 +126,12 @@ final class SupabaseBackend: GlimpseBackend {
     }
 
     /// Asks the media function for a one-time upload URL, then PUTs the bytes there.
-    private func upload(fileURL: URL? = nil, data: Data? = nil, kind: String, ext: String) async throws -> String {
+    private func upload(fileURL: URL? = nil, data: Data? = nil, kind: String, ext: String, bytes: Int? = nil) async throws -> String {
+        let size = bytes ?? data?.count
+        if let size, size > VideoCompressor.maxBytes { throw GlimpseError.videoTooLarge }
         let ticket: UploadTicket = try await client.functions.invoke(
             "media",
-            options: FunctionInvokeOptions(body: ["action": "upload_url", "kind": kind, "ext": ext])
+            options: FunctionInvokeOptions(body: UploadTicketRequest(kind: kind, ext: ext, bytes: size))
         )
         guard let url = URL(string: ticket.uploadURL) else { throw GlimpseError.message("Upload failed.") }
         var request = URLRequest(url: url)
@@ -182,20 +184,27 @@ final class SupabaseBackend: GlimpseBackend {
 
     func deleteVideo(_ video: ProfileVideo) async throws {
         try await client.from("profile_videos").delete().eq("id", value: video.id.uuidString).execute()
-        let paths = [video.storagePath] + [video.thumbnailPath].compactMap { $0 }
+        let paths = [video.storagePath, video.thumbnailPath].compactMap { $0 }
+        guard !paths.isEmpty else { return }
         _ = try? await client.functions.invoke(
             "media",
             options: FunctionInvokeOptions(body: MediaPathsRequest(action: "delete", paths: paths))
         )
     }
 
-    func importInstagram(code: String) async throws -> [ProfileVideo] {
-        let response: SocialImportResponse = try await client.functions.invoke(
-            "social-import",
-            options: FunctionInvokeOptions(body: SocialImportRequest(provider: "instagram", code: code)),
-            decoder: JSONDecoder.glimpse()
-        )
-        return response.imported
+    func addEmbed(_ link: EmbedLink, promptKey: String?) async throws -> ProfileVideo {
+        do {
+            return try await client.rpc(
+                "add_embed_video",
+                params: EmbedParams(url: link.canonicalURL.absoluteString, promptKey: promptKey)
+            ).execute().value
+        } catch let error as PostgrestError {
+            switch error.message {
+            case "invalid_embed_url": throw GlimpseError.invalidEmbedLink
+            case "already_added": throw GlimpseError.videoAlreadyAdded
+            default: throw error
+            }
+        }
     }
 
     // MARK: Discovery
@@ -754,13 +763,21 @@ private struct PurchaseResponse: Decodable, Sendable {
     let plan: String
 }
 
-private struct SocialImportRequest: Encodable, Sendable {
-    let provider: String
-    let code: String
+private struct UploadTicketRequest: Encodable, Sendable {
+    let action = "upload_url"
+    let kind: String
+    let ext: String
+    let bytes: Int?
 }
 
-private struct SocialImportResponse: Decodable, Sendable {
-    let imported: [ProfileVideo]
+private struct EmbedParams: Encodable, Sendable {
+    let url: String
+    let promptKey: String?
+
+    enum CodingKeys: String, CodingKey {
+        case url = "p_url"
+        case promptKey = "p_prompt_key"
+    }
 }
 
 private struct TypingPayload: Codable, Sendable {

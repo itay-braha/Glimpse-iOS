@@ -3,8 +3,7 @@ import SwiftUI
 struct MyProfileView: View {
     @Environment(AppModel.self) private var app
     @State private var model = ProfileModel()
-    @State private var showAddOptions = false
-    @State private var showRecorder = false
+    @State private var showAddVideo = false
     @State private var showSettings = false
     @State private var previewing: ProfileVideo?
 
@@ -18,7 +17,7 @@ struct MyProfileView: View {
 
                     if !model.staleVideos.isEmpty {
                         RotationPrompt(count: model.staleVideos.count) {
-                            showAddOptions = true
+                            showAddVideo = true
                         }
                     }
 
@@ -47,7 +46,7 @@ struct MyProfileView: View {
                                     .accessibilityAddTraits(.isButton)
                             }
                             if model.canAddVideo {
-                                AddVideoTile(isBusy: model.isImporting) { showAddOptions = true }
+                                AddVideoTile { showAddVideo = true }
                             }
                         }
                         Text("Every moment shows when it was added. Clips older than 90 days get a nudge to rotate. Long-press a clip to make it your cover.")
@@ -79,20 +78,11 @@ struct MyProfileView: View {
         .task {
             await model.load(using: app.backend)
             if app.launch.screen == .settings { showSettings = true }
+            if app.launch.screen == .addVideo { showAddVideo = true }
         }
-        .confirmationDialog("Add a moment", isPresented: $showAddOptions, titleVisibility: .visible) {
-            Button("Record a 15s clip") { showRecorder = true }
-            Button("Import from Instagram") {
-                Task { await model.importInstagram(using: app.backend, config: app.config) }
-            }
-        } message: {
-            Text("TikTok import is coming soon.")
-        }
-        .fullScreenCover(isPresented: $showRecorder) {
-            RecorderView { video in
-                if let video {
-                    Task { await model.added(video, using: app.backend) }
-                }
+        .sheet(isPresented: $showAddVideo) {
+            AddVideoSheet { video in
+                Task { await model.added(video, using: app.backend) }
             }
         }
         .sheet(isPresented: $showSettings) {
@@ -187,7 +177,15 @@ private struct VideoTile: View {
             .background {
                 ZStack {
                     Palette.seededGradient(video.id.uuidString)
-                    if let thumbnailURL {
+                    if let link = video.embedLink {
+                        VStack(spacing: 6) {
+                            Image(systemName: video.source.symbolName)
+                                .font(.title2)
+                            Text(link.platform.name)
+                                .font(.caption.weight(.heavy))
+                        }
+                        .foregroundStyle(.white.opacity(0.85))
+                    } else if let thumbnailURL {
                         AsyncImage(url: thumbnailURL) { phase in
                             phase.image?.resizable().scaledToFill()
                         }
@@ -219,12 +217,11 @@ private struct VideoTile: View {
                     .strokeBorder(isStale ? Palette.pink : Palette.stroke, lineWidth: isStale ? 2 : 1)
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("\(video.source.displayName) moment, \(Recency.label(video.importedAt))\(isStale ? ", needs rotating" : "")")
+            .accessibilityLabel("\(video.isEmbed ? "\(video.source.displayName) link" : video.source.displayName) moment, \(Recency.label(video.importedAt))\(isStale ? ", needs rotating" : "")")
     }
 }
 
 private struct AddVideoTile: View {
-    let isBusy: Bool
     let action: () -> Void
 
     var body: some View {
@@ -232,15 +229,11 @@ private struct AddVideoTile: View {
             Color.clear
                 .aspectRatio(9 / 16, contentMode: .fit)
                 .overlay {
-                    if isBusy {
-                        ProgressView()
-                    } else {
-                        VStack(spacing: 6) {
-                            Image(systemName: "plus").font(.title2.weight(.bold))
-                            Text("Add").font(.caption.weight(.semibold))
-                        }
-                        .foregroundStyle(Palette.mint)
+                    VStack(spacing: 6) {
+                        Image(systemName: "plus").font(.title2.weight(.bold))
+                        Text("Add").font(.caption.weight(.semibold))
                     }
+                    .foregroundStyle(Palette.mint)
                 }
                 .background(Palette.surface, in: .rect(cornerRadius: 14))
                 .overlay {
@@ -249,8 +242,8 @@ private struct AddVideoTile: View {
                 }
         }
         .buttonStyle(.plain)
-        .disabled(isBusy)
         .accessibilityLabel("Add a moment")
+        .accessibilityIdentifier("profile.addVideo")
     }
 }
 

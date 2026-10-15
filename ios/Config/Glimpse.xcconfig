@@ -7,6 +7,5 @@
 
 SUPABASE_PROJECT_HOST =
 SUPABASE_PUBLISHABLE_KEY =
-INSTAGRAM_APP_ID =
 
 #include? "Secrets.xcconfig"

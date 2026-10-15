@@ -33,6 +33,11 @@ final class FlowTests: XCTestCase {
         return field.exists ? field : app.textViews[label]
     }
 
+    private func waitUntilGone(_ element: XCUIElement, timeout: Double) -> Bool {
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: element)
+        return XCTWaiter.wait(for: [gone], timeout: timeout) == .completed
+    }
+
     private func pause(_ seconds: Double) {
         RunLoop.current.run(until: Date().addingTimeInterval(seconds))
     }
@@ -68,10 +73,14 @@ final class FlowTests: XCTestCase {
         snap("1-4 Profile basics")
         app.buttons["Continue"].tap()
 
-        let record = button(app, containing: "Record a clip")
-        XCTAssertTrue(record.waitForExistence(timeout: 10))
-        snap("1-5 First moment")
-        record.tap()
+        let idea = app.buttons["hub.inspiration"]
+        XCTAssertTrue(idea.waitForExistence(timeout: 10))
+        snap("1-5 Let others get a Glimpse of YOU")
+        idea.tap()
+
+        let camera = app.buttons["inspiration.camera.best_friend"]
+        XCTAssertTrue(camera.waitForExistence(timeout: 10))
+        camera.tap()
 
         let sample = app.buttons["Use a sample moment"]
         XCTAssertTrue(sample.waitForExistence(timeout: 10))
@@ -170,5 +179,84 @@ final class FlowTests: XCTestCase {
         tryPlus.tap()
         pause(3)
         snap("4-4 Everyone revealed with Glimpse+")
+    }
+
+    // A -> G: the three ways to add a moment, from the profile's Add button.
+    func testVideoFirstProfile() {
+        let app = launch("addVideo")
+        let upload = app.buttons["hub.upload"]
+        XCTAssertTrue(upload.waitForExistence(timeout: 20))
+        snap("5-1 Let others get a Glimpse of YOU")
+        upload.tap()
+
+        let sample = app.buttons["upload.sample"]
+        XCTAssertTrue(sample.waitForExistence(timeout: 10))
+        snap("5-2 Quick upload rules")
+        sample.tap()
+
+        let add = app.buttons["upload.add"]
+        XCTAssertTrue(add.waitForExistence(timeout: 60))
+        pause(2)
+        snap("5-3 Clip checked (length, 9:16, 20 MB)")
+        add.tap()
+        XCTAssertTrue(waitUntilGone(add, timeout: 60))
+
+        let addTile = app.buttons["profile.addVideo"]
+        XCTAssertTrue(addTile.waitForExistence(timeout: 10))
+        pause(1)
+        snap("5-4 Uploaded moment on the profile")
+        addTile.tap()
+
+        let embed = app.buttons["hub.embed"]
+        XCTAssertTrue(embed.waitForExistence(timeout: 10))
+        embed.tap()
+        let field = app.textFields["embed.field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        field.tap()
+        field.typeText("https://www.instagram.com/reel/C9xYzAbC12/?igsh=MWQ1ZGUx")
+        XCTAssertTrue(app.staticTexts["embed.found"].waitForExistence(timeout: 10)
+            || text(app, containing: "video found").waitForExistence(timeout: 5))
+        snap("5-5 Public Reel recognized")
+
+        app.staticTexts["Link a public video"].tap() // dismiss the keyboard
+        app.scrollViews.firstMatch.swipeUp()
+        let consent = app.switches["embed.consent"]
+        XCTAssertTrue(consent.waitForExistence(timeout: 10))
+        consent.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
+        pause(0.5)
+        snap("5-6 Links-to-your-profile consent")
+        let addLink = app.buttons["embed.add"]
+        XCTAssertTrue(addLink.isEnabled)
+        addLink.tap()
+        XCTAssertTrue(waitUntilGone(addLink, timeout: 20))
+
+        let linkedTile = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Instagram link moment")).firstMatch
+        XCTAssertTrue(linkedTile.waitForExistence(timeout: 10))
+        pause(1)
+        snap("5-7 Linked Reel on the profile")
+    }
+
+    // A -> C: the viewer. Clips start muted, one tap turns sound on, linked posts
+    // play in the platform's own player with a badge that opens the app.
+    func testVideoViewer() {
+        let app = launch("feed")
+        let mute = app.buttons["muteToggle"].firstMatch
+        XCTAssertTrue(mute.waitForExistence(timeout: 20))
+        pause(4)
+        XCTAssertEqual(mute.label, "Unmute")
+        snap("6-1 Muted by default")
+        mute.tap()
+        XCTAssertEqual(mute.label, "Mute")
+        snap("6-2 Sound on")
+
+        let card = app.windows.firstMatch
+        card.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.4)).tap()
+        pause(1)
+        card.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.4)).tap()
+        let badge = app.buttons["platformBadge"].firstMatch
+        XCTAssertTrue(badge.waitForExistence(timeout: 10))
+        pause(1.5)
+        snap("6-3 Linked TikTok in its own player")
     }
 }

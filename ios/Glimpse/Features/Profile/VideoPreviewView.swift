@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Full-screen look at one of my clips, with tools: tag myself ("It's me"),
-/// change the vibe prompt, and export a watermarked copy to share.
+/// change the vibe prompt, and export a watermarked copy to share. Linked
+/// Instagram/TikTok posts play in the platform's player and only take a prompt.
 struct VideoPreviewView: View {
     let video: ProfileVideo
     let url: URL?
@@ -15,6 +16,7 @@ struct VideoPreviewView: View {
     @State private var isExporting = false
     @State private var exportedURL: URL?
     @State private var errorMessage: String?
+    @State private var preferences = PlaybackPreferences.shared
 
     init(video: ProfileVideo, url: URL?, shareCaption: String, onUpdate: @escaping (VibePrompt?, CGPoint?) -> Void) {
         self.video = video
@@ -30,8 +32,13 @@ struct VideoPreviewView: View {
         GeometryReader { proxy in
             ZStack {
                 Color.black.ignoresSafeArea()
-                if let url {
-                    LoopingVideoPlayer(url: url, isActive: true)
+                if let link = video.embedLink {
+                    EmbedStage(link: link)
+                        .padding(.top, 72)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 150)
+                } else if let url {
+                    LoopingVideoPlayer(url: url, isActive: true, isMuted: preferences.isMuted)
                         .ignoresSafeArea()
                 }
                 if let marker {
@@ -71,6 +78,9 @@ struct VideoPreviewView: View {
                 PromptSticker(prompt: prompt)
             }
             Spacer()
+            if !video.isEmbed {
+                MuteToggle()
+            }
             Button("Close", systemImage: "xmark") { dismiss() }
                 .labelStyle(.iconOnly)
                 .font(.title3.weight(.semibold))
@@ -86,8 +96,10 @@ struct VideoPreviewView: View {
             if let errorMessage { ErrorText(errorMessage) }
             RecencyBadge(video: video)
             HStack(spacing: 10) {
-                Button(marker == nil ? "Tag me" : "Move tag", systemImage: "person.crop.circle.badge.checkmark") {
-                    isTagging = true
+                if !video.isEmbed {
+                    Button(marker == nil ? "Tag me" : "Move tag", systemImage: "person.crop.circle.badge.checkmark") {
+                        isTagging = true
+                    }
                 }
                 Menu {
                     Button("No prompt") { setPrompt(nil) }
@@ -97,7 +109,11 @@ struct VideoPreviewView: View {
                 } label: {
                     Label("Prompt", systemImage: "quote.bubble")
                 }
-                if let exportedURL {
+                if let link = video.embedLink {
+                    ShareLink(item: link.canonicalURL) {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+                } else if let exportedURL {
                     ShareLink(item: exportedURL) {
                         Label("Share", systemImage: "square.and.arrow.up")
                     }

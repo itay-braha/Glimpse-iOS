@@ -36,16 +36,24 @@ struct GrowthAndVibeTests {
         #expect(!feed.isEmpty)
     }
 
-    @Test func aFrozenConnectionIsNeverReleased() async throws {
+    @Test func aFreezeOnlyProtectsALiveConversation() async throws {
         let backend = DemoBackend(seeded: true)
+        // Dana has been silent for 19 days: a freeze can't keep a dead conversation alive.
         try await backend.setFrozen(dana, frozen: true)
-        #expect(try await backend.capacityStatus().nextToBoot?.displayName != "Dana")
+        #expect(try await backend.capacityStatus().nextToBoot?.displayName == "Dana")
+        try await backend.setFrozen(dana, frozen: false)
 
-        let admirer = try #require(DemoData.admirers().first)
-        let result = try await backend.swipe(on: admirer.id, liked: true)
-        #expect(result.booted != nil)
-        #expect(result.booted?.displayName != "Dana")
-        #expect(try await backend.missedConnections().contains { $0.matchID == result.booted?.matchID })
+        // Hila is active, so freezing her means she's never the one released.
+        let hila = DemoData.id(1_001)
+        try await backend.setFrozen(hila, frozen: true)
+        for admirer in DemoData.admirers() {
+            let result = try await backend.swipe(on: admirer.id, liked: true)
+            #expect(result.booted?.matchID != hila)
+            if let booted = result.booted {
+                #expect(try await backend.missedConnections().contains { $0.matchID == booted.matchID })
+            }
+        }
+        #expect(try await backend.fetchMatches().contains { $0.matchID == hila })
     }
 
     @Test func freeMembersGetOneFreeze() async throws {

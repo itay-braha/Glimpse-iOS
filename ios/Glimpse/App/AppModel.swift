@@ -60,14 +60,14 @@ final class AppModel {
             backend = SupabaseBackend(config: config)
         } else {
             let seeded = launch.screen != nil && launch.screen != .welcome
-            backend = DemoBackend(seeded: seeded)
+            backend = DemoBackend(seeded: seeded, withVideos: launch.screen != .firstVideo)
         }
         switch launch.screen {
         case .connections, .chat: selectedTab = .connections
         case .likes:
             selectedTab = .connections
             showLikesYou = true
-        case .profile, .settings: selectedTab = .profile
+        case .profile, .settings, .addVideo: selectedTab = .profile
         case .paywall: paywall = .settings
         default: selectedTab = .discover
         }

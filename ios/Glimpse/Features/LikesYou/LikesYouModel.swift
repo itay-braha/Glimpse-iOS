@@ -78,7 +78,7 @@ final class LikesYouModel {
     }
 
     private func resolveMedia(using backend: any GlimpseBackend) async {
-        let paths = likes.items.compactMap(\.profile).flatMap { $0.videos.map(\.storagePath) }
+        let paths = likes.items.compactMap(\.profile).flatMap { $0.videos.compactMap(\.storagePath) }
         guard !paths.isEmpty else { return }
         let signed = await backend.mediaURLs(for: paths)
         for (path, remote) in signed {

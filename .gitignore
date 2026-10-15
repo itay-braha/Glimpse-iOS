@@ -22,3 +22,4 @@ node_modules/
 screenshots/
 build.log
 .claude/settings.local.json
+docs/test-evidence/*.mp4

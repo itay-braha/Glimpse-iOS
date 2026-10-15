@@ -190,7 +190,7 @@ final class FeedModel {
     }
 
     private func resolveMedia(for batch: [FeedProfile], using backend: any GlimpseBackend) async {
-        let paths = batch.flatMap { $0.videos.map(\.storagePath) }
+        let paths = batch.flatMap { $0.videos.compactMap(\.storagePath) }
         let signed = await backend.mediaURLs(for: paths)
         for (path, remote) in signed {
             playableURLs[path] = await VideoCache.shared.playableURL(for: path, remote: remote)
@@ -201,8 +201,7 @@ final class FeedModel {
         guard let id, let index = profiles.firstIndex(where: { $0.id == id }) else { return }
         let upcoming = profiles.dropFirst(index + 1).prefix(2)
         for profile in upcoming {
-            guard let video = profile.videos.first, let url = playableURLs[video.storagePath], !url.isFileURL else { continue }
-            let path = video.storagePath
+            guard let path = profile.videos.first?.storagePath, let url = playableURLs[path], !url.isFileURL else { continue }
             Task { await VideoCache.shared.prefetch(key: path, remote: url) }
         }
     }
