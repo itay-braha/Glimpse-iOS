@@ -34,7 +34,7 @@ struct MyProfileView: View {
                                 VideoTile(video: video, thumbnailURL: model.url(for: video.thumbnailPath))
                                     .onTapGesture { previewing = video }
                                     .contextMenu {
-                                        if video.id != model.videos.first?.id {
+                                        if video.id != model.videos.first?.id, !video.isEmbed {
                                             Button("Make cover", systemImage: "star") {
                                                 Task { await model.makeCover(video, using: app.backend) }
                                             }
@@ -49,7 +49,7 @@ struct MyProfileView: View {
                                 AddVideoTile { showAddVideo = true }
                             }
                         }
-                        Text("Every moment shows when it was added. Clips older than 90 days get a nudge to rotate. Long-press a clip to make it your cover.")
+                        Text("Every moment shows when it was added. Clips older than 90 days get a nudge to rotate. Long-press a clip to make it your cover. Your own clips always come first; linked posts follow.")
                             .font(.footnote)
                             .foregroundStyle(Palette.textTertiary)
                     }
@@ -81,7 +81,7 @@ struct MyProfileView: View {
             if app.launch.screen == .addVideo { showAddVideo = true }
         }
         .sheet(isPresented: $showAddVideo) {
-            AddVideoSheet { video in
+            AddVideoSheet(canLink: model.canLink) { video in
                 Task { await model.added(video, using: app.backend) }
             }
         }
@@ -170,6 +170,7 @@ private struct VideoTile: View {
     let thumbnailURL: URL?
 
     private var isStale: Bool { Recency.isStale(video.importedAt) }
+    private var needsAttention: Bool { isStale || video.isUnavailable }
 
     var body: some View {
         Color.clear
@@ -201,7 +202,15 @@ private struct VideoTile: View {
                     .padding(6)
             }
             .overlay(alignment: .topTrailing) {
-                if isStale {
+                if video.isUnavailable {
+                    Text("Unavailable")
+                        .font(.caption2.weight(.heavy))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(Palette.pink, in: .capsule)
+                        .padding(6)
+                } else if isStale {
                     Text("Rotate")
                         .font(.caption2.weight(.heavy))
                         .foregroundStyle(.white)
@@ -214,10 +223,10 @@ private struct VideoTile: View {
             .clipShape(.rect(cornerRadius: 14))
             .overlay {
                 RoundedRectangle(cornerRadius: 14)
-                    .strokeBorder(isStale ? Palette.pink : Palette.stroke, lineWidth: isStale ? 2 : 1)
+                    .strokeBorder(needsAttention ? Palette.pink : Palette.stroke, lineWidth: needsAttention ? 2 : 1)
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("\(video.isEmbed ? "\(video.source.displayName) link" : video.source.displayName) moment, \(Recency.label(video.importedAt))\(isStale ? ", needs rotating" : "")")
+            .accessibilityLabel("\(video.isEmbed ? "\(video.source.displayName) link" : video.source.displayName) moment, \(Recency.label(video.importedAt))\(video.isUnavailable ? ", no longer available, hidden from others" : isStale ? ", needs rotating" : "")")
     }
 }
 

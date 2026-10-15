@@ -2,9 +2,12 @@ import SwiftUI
 
 /// "Link a public Reel or TikTok": nothing is copied; the post plays through the
 /// platform's official player. Because viewers can tap through to the owner's
-/// social profile, adding one requires an explicit acknowledgement.
+/// social profile, adding one requires an explicit acknowledgement. Stories expire,
+/// so they're sent to Quick upload instead.
 struct EmbedLinkView: View {
     let onAdded: (ProfileVideo) -> Void
+    /// Switches to Quick upload (for Stories, which can't be linked).
+    var onUseUpload: () -> Void = {}
 
     @Environment(AppModel.self) private var app
     @State private var text = ""
@@ -25,7 +28,11 @@ struct EmbedLinkView: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 field
-                status
+                if EmbedLink.isStory(text) {
+                    storyNotice
+                } else {
+                    status
+                }
 
                 if let link {
                     EmbedStage(link: link)
@@ -107,13 +114,36 @@ struct EmbedLinkView: View {
         }
     }
 
+    private var storyNotice: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Stories can't be linked")
+                        .font(.glimpseHeadline)
+                    Text("Stories disappear after 24 hours, so your profile would go blank. Save it to your camera roll and upload it instead. Glimpse keeps a private copy.")
+                        .font(.subheadline)
+                        .foregroundStyle(Palette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } icon: {
+                Image(systemName: "clock.badge.xmark").foregroundStyle(Palette.pink)
+            }
+            Button("Upload it instead", systemImage: "photo.on.rectangle", action: onUseUpload)
+                .buttonStyle(.glimpseSecondary)
+                .accessibilityIdentifier("embed.useUpload")
+        }
+        .padding(14)
+        .background(Palette.pink.opacity(0.08), in: .rect(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Palette.pink.opacity(0.35)))
+    }
+
     private func disclosure(for link: EmbedLink) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Label {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("This links to your \(link.platform.name)")
                         .font(.glimpseHeadline)
-                    Text("Anyone who taps this video can open it in \(link.platform.name), where your username, profile and other posts are visible. Glimpse never shows your handle anywhere else.")
+                    Text("Anyone who taps this video can open it in \(link.platform.name), where your username, profile and other posts are visible. Glimpse never shows your handle anywhere else. If the post is deleted, made private or expires, we hide it and let you know.")
                         .font(.subheadline)
                         .foregroundStyle(Palette.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)

@@ -25,6 +25,8 @@ struct GlimpseOfYouHeader: View {
 }
 
 struct VideoHubOptions: View {
+    /// Links only once there's a clip of your own to anchor the profile.
+    var canLink = true
     let onSelect: (AddVideoRoute) -> Void
 
     var body: some View {
@@ -41,8 +43,11 @@ struct VideoHubOptions: View {
                 symbol: "link",
                 tint: Palette.pink,
                 title: "Link a public Reel or TikTok",
-                detail: "Already posted something great? It plays right on your profile."
+                detail: canLink
+                    ? "Already posted something great? It plays right on your profile."
+                    : "Unlocks after your first clip. Links sit on top of a clip of your own."
             ) { onSelect(.embed) }
+                .disabled(!canLink)
                 .accessibilityIdentifier("hub.embed")
 
             VideoSourceCard(
@@ -59,11 +64,13 @@ struct VideoHubOptions: View {
 struct AddVideoDestination: View {
     let route: AddVideoRoute
     let onAdded: (ProfileVideo) -> Void
+    /// Moves to another way of adding (a Story link goes to Quick upload).
+    var onSwitch: (AddVideoRoute) -> Void = { _ in }
 
     var body: some View {
         switch route {
         case .upload: UploadVideoView(onAdded: onAdded)
-        case .embed: EmbedLinkView(onAdded: onAdded)
+        case .embed: EmbedLinkView(onAdded: onAdded) { onSwitch(.upload) }
         case .inspiration: InspirationView(onAdded: onAdded)
         }
     }
@@ -71,6 +78,7 @@ struct AddVideoDestination: View {
 
 /// Profile "Add" flow: the hub, then one of the three ways, in one sheet.
 struct AddVideoSheet: View {
+    var canLink = true
     var startAt: AddVideoRoute?
     let onAdded: (ProfileVideo) -> Void
 
@@ -82,7 +90,7 @@ struct AddVideoSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     GlimpseOfYouHeader()
-                    VideoHubOptions { path.append($0) }
+                    VideoHubOptions(canLink: canLink) { path.append($0) }
                 }
                 .padding(20)
             }
@@ -96,6 +104,8 @@ struct AddVideoSheet: View {
                 AddVideoDestination(route: route) { video in
                     onAdded(video)
                     dismiss()
+                } onSwitch: { next in
+                    path = [next]
                 }
             }
         }

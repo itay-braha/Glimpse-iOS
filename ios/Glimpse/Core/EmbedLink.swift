@@ -68,6 +68,14 @@ struct EmbedLink: Equatable, Sendable {
         return nil
     }
 
+    /// Instagram Stories and Highlights: Instagram can't embed them and Stories
+    /// expire after 24 hours, so they're uploaded instead (Glimpse keeps a copy).
+    static func isStory(_ raw: String) -> Bool {
+        let text = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let regex = /^(https?:\/\/)?(www\.|m\.)?instagram\.com\/stories\//
+        return text.firstMatch(of: regex) != nil
+    }
+
     /// Share links like vm.tiktok.com/ZM… redirect to the full URL; nothing else needs expanding.
     static func needsExpansion(_ raw: String) -> Bool {
         let host = URL(string: raw.trimmingCharacters(in: .whitespacesAndNewlines))?.host()?.lowercased() ?? ""

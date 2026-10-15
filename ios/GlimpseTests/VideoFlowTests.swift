@@ -43,6 +43,42 @@ struct VideoFlowTests {
         #expect(tiktok.playerURL.query()?.contains("muted=1") == true)
     }
 
+    @Test(arguments: [
+        "https://www.instagram.com/stories/maya.tlv/3301234567890123456/",
+        "instagram.com/stories/highlights/17912345678901234/",
+        "https://m.instagram.com/stories/maya.tlv/",
+    ])
+    func storiesAreRecognizedAndNotLinkable(raw: String) {
+        #expect(EmbedLink.isStory(raw))
+        #expect(EmbedLink.parse(raw) == nil)
+    }
+
+    @Test func postsAreNotStories() {
+        #expect(!EmbedLink.isStory("https://www.instagram.com/reel/C9xYz_AbC12/"))
+        #expect(!EmbedLink.isStory("https://www.tiktok.com/@maya.tlv/video/7301234567890123456"))
+    }
+
+    @Test func unknownNotificationKindsDontBreakTheList() throws {
+        let json = Data("""
+        [{"id":"00000000-0000-4000-8000-000000000003","kind":"video_unavailable","title":"t","body":"b",
+          "created_at":"2026-10-01T10:00:00Z"},
+         {"id":"00000000-0000-4000-8000-000000000004","kind":"something_new","title":"t","body":"b",
+          "created_at":"2026-10-01T10:00:00Z"}]
+        """.utf8)
+        let items = try JSONDecoder.glimpse().decode([AppNotification].self, from: json)
+        #expect(items.map(\.kind) == [.videoUnavailable, .other])
+    }
+
+    @Test func goneLinksAreFlaggedForTheOwner() throws {
+        let json = Data("""
+        {"id":"00000000-0000-4000-8000-000000000005","source":"tiktok","video_type":"embed",
+         "embed_url":"https://www.tiktok.com/@maya.tlv/video/7301234567890123456","moderation_status":"unavailable",
+         "captured_at":"2026-10-01T10:00:00Z","imported_at":"2026-10-01T10:00:00Z"}
+        """.utf8)
+        let video = try JSONDecoder.glimpse().decode(ProfileVideo.self, from: json)
+        #expect(video.isUnavailable)
+    }
+
     @Test func shortShareLinksAreExpandedFirst() {
         #expect(EmbedLink.needsExpansion("https://vm.tiktok.com/ZMabc123/"))
         #expect(EmbedLink.needsExpansion("https://www.tiktok.com/t/ZTabc123/"))
@@ -99,6 +135,35 @@ struct VideoFlowTests {
         await #expect(throws: GlimpseError.videoAlreadyAdded) {
             try await backend.addEmbed(link, promptKey: nil)
         }
+    }
+
+    @Test func linksNeedAClipOfYourOwnAndSortAfterIt() async throws {
+        let backend = DemoBackend(seeded: true, withVideos: false)
+        let link = try #require(EmbedLink.parse("https://www.tiktok.com/@maya.tlv/video/7301234567890123456"))
+        await #expect(throws: GlimpseError.hostedFirst) {
+            try await backend.addEmbed(link, promptKey: nil)
+        }
+
+        let clip = RecordedClip(fileURL: URL(fileURLWithPath: "/tmp/a.mp4"), durationSeconds: 10, thumbnailJPEG: nil)
+        let own = try await backend.uploadClip(clip)
+        let linked = try await backend.addEmbed(link, promptKey: nil)
+        #expect(await backend.fetchMyVideos().map(\.id) == [own.id, linked.id])
+
+        await #expect(throws: GlimpseError.lastHostedClip) {
+            try await backend.deleteVideo(own)
+        }
+        try await backend.deleteVideo(linked)
+    }
+
+    @Test(arguments: [
+        ("This post is unavailable.", true),
+        ("Video currently unavailable", true),
+        ("Sorry, this content isn't available right now", true),
+        ("maya.tlv • Sunrise swim 🌊  View more on Instagram", false),
+    ])
+    @MainActor
+    func unplayablePlayersAreRecognized(text: String, unavailable: Bool) {
+        #expect(EmbedHealth.looksUnavailable(text) == unavailable)
     }
 
     @Test func uploadsKeepTheirSource() async throws {

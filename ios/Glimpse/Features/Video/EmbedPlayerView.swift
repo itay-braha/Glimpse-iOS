@@ -7,10 +7,14 @@ import WebKit
 ///   * no script bridges into Glimpse;
 ///   * any tap that leaves the player (profile, "View on Instagram", …) opens
 ///     outside Glimpse, in the platform's app when installed.
-/// Demo builds show a stand-in instead of calling the platforms.
+/// When the platform shows a viewer nothing (deleted, private or expired post),
+/// the app quietly tells the server; enough viewers hide the link. Demo builds
+/// show a stand-in instead of calling the platforms.
 struct EmbedPlayerView: View {
     let link: EmbedLink
     var isActive = true
+    /// Set for other people's videos, so an unplayable link can be reported.
+    var videoID: UUID?
 
     @Environment(AppModel.self) private var app
     @State private var hasStarted = false
@@ -21,7 +25,10 @@ struct EmbedPlayerView: View {
             if app.isDemo {
                 DemoEmbedStandIn(link: link)
             } else if hasStarted {
-                EmbedWebView(link: link, isActive: isActive)
+                EmbedWebView(link: link, isActive: isActive) {
+                    guard let videoID else { return }
+                    EmbedHealth.reportOnce(videoID, using: app.backend)
+                }
             } else {
                 ProgressView().tint(.white)
             }
@@ -79,9 +86,10 @@ struct PlatformBadge: View {
 struct EmbedStage: View {
     let link: EmbedLink
     var isActive = true
+    var videoID: UUID?
 
     var body: some View {
-        EmbedPlayerView(link: link, isActive: isActive)
+        EmbedPlayerView(link: link, isActive: isActive, videoID: videoID)
             .clipShape(.rect(cornerRadius: 22))
             .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(.white.opacity(0.14)))
             .overlay(alignment: .topTrailing) {
@@ -113,11 +121,30 @@ private struct DemoEmbedStandIn: View {
     }
 }
 
+/// One silent report per video per app session.
+@MainActor
+enum EmbedHealth {
+    private static var reported: Set<UUID> = []
+
+    static func reportOnce(_ videoID: UUID, using backend: any GlimpseBackend) {
+        guard reported.insert(videoID).inserted else { return }
+        Task { await backend.reportEmbedUnplayable(videoID) }
+    }
+
+    /// Words the platforms' players show instead of a video.
+    static func looksUnavailable(_ pageText: String) -> Bool {
+        let text = pageText.lowercased()
+        return ["unavailable", "no longer available", "isn't available", "not available", "has been removed"]
+            .contains { text.contains($0) }
+    }
+}
+
 private struct EmbedWebView: UIViewRepresentable {
     let link: EmbedLink
     let isActive: Bool
+    let onUnplayable: () -> Void
 
-    func makeCoordinator() -> Coordinator { Coordinator(link: link) }
+    func makeCoordinator() -> Coordinator { Coordinator(link: link, onUnplayable: onUnplayable) }
 
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
@@ -153,9 +180,31 @@ private struct EmbedWebView: UIViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         private let link: EmbedLink
+        private let onUnplayable: () -> Void
 
-        init(link: EmbedLink) {
+        init(link: EmbedLink, onUnplayable: @escaping () -> Void) {
             self.link = link
+            self.onUnplayable = onUnplayable
+        }
+
+        /// The player page itself answered "gone" (404/410). Network errors on the
+        /// viewer's side are never reported.
+        func webView(_ webView: WKWebView, decidePolicyFor response: WKNavigationResponse) async -> WKNavigationResponsePolicy {
+            if response.isForMainFrame, let http = response.response as? HTTPURLResponse, [404, 410].contains(http.statusCode) {
+                onUnplayable()
+            }
+            return .allow
+        }
+
+        /// The page loaded but shows the platform's "unavailable" card.
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            Task { [weak webView] in
+                try? await Task.sleep(for: .seconds(3))
+                guard let webView,
+                      let text = try? await webView.evaluateJavaScript("document.body ? document.body.innerText : ''") as? String
+                else { return }
+                if EmbedHealth.looksUnavailable(text) { self.onUnplayable() }
+            }
         }
 
         /// Hosts the player itself may use. Anything else, or any tap on a link,

@@ -213,18 +213,25 @@ final class FlowTests: XCTestCase {
         let field = app.textFields["embed.field"]
         XCTAssertTrue(field.waitForExistence(timeout: 10))
         field.tap()
+        field.typeText("https://www.instagram.com/stories/glimpse.demo/3301234567890123456/")
+        XCTAssertTrue(app.buttons["embed.useUpload"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["embed.add"].isEnabled)
+        snap("5-5 Stories must be uploaded, not linked")
+        app.buttons["Clear"].tap()
+
+        field.tap()
         field.typeText("https://www.instagram.com/reel/C9xYzAbC12/?igsh=MWQ1ZGUx")
         XCTAssertTrue(app.staticTexts["embed.found"].waitForExistence(timeout: 10)
             || text(app, containing: "video found").waitForExistence(timeout: 5))
-        snap("5-5 Public Reel recognized")
+        snap("5-6 Public Reel recognized")
 
-        app.staticTexts["Link a public video"].tap() // dismiss the keyboard
+        field.typeText("\n") // the return key dismisses the keyboard
         app.scrollViews.firstMatch.swipeUp()
         let consent = app.switches["embed.consent"]
         XCTAssertTrue(consent.waitForExistence(timeout: 10))
         consent.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
         pause(0.5)
-        snap("5-6 Links-to-your-profile consent")
+        snap("5-7 Links-to-your-profile consent")
         let addLink = app.buttons["embed.add"]
         XCTAssertTrue(addLink.isEnabled)
         addLink.tap()
@@ -234,7 +241,7 @@ final class FlowTests: XCTestCase {
             .matching(NSPredicate(format: "label BEGINSWITH %@", "Instagram link moment")).firstMatch
         XCTAssertTrue(linkedTile.waitForExistence(timeout: 10))
         pause(1)
-        snap("5-7 Linked Reel on the profile")
+        snap("5-8 Linked Reel on the profile")
     }
 
     // A -> C: the viewer. Clips start muted, one tap turns sound on, linked posts

@@ -20,6 +20,9 @@ struct ProfileVideo: Codable, Identifiable, Hashable, Sendable {
     /// Normalized position of the owner in the frame ("It's me" tag), for group clips.
     var meMarkerX: Double?
     var meMarkerY: Double?
+    /// Owner's own rows only: 'visible', 'hidden' (under review) or 'unavailable'
+    /// (a linked post that was deleted or expired; viewers no longer see it).
+    var moderationStatus: String?
 
     init(
         id: UUID,
@@ -33,7 +36,8 @@ struct ProfileVideo: Codable, Identifiable, Hashable, Sendable {
         importedAt: Date,
         promptKey: String? = nil,
         meMarkerX: Double? = nil,
-        meMarkerY: Double? = nil
+        meMarkerY: Double? = nil,
+        moderationStatus: String? = nil
     ) {
         self.id = id
         self.source = source
@@ -47,6 +51,7 @@ struct ProfileVideo: Codable, Identifiable, Hashable, Sendable {
         self.promptKey = promptKey
         self.meMarkerX = meMarkerX
         self.meMarkerY = meMarkerY
+        self.moderationStatus = moderationStatus
     }
 
     init(from decoder: any Decoder) throws {
@@ -64,10 +69,12 @@ struct ProfileVideo: Codable, Identifiable, Hashable, Sendable {
         promptKey = try container.decodeIfPresent(String.self, forKey: .promptKey)
         meMarkerX = try container.decodeIfPresent(Double.self, forKey: .meMarkerX)
         meMarkerY = try container.decodeIfPresent(Double.self, forKey: .meMarkerY)
+        moderationStatus = try container.decodeIfPresent(String.self, forKey: .moderationStatus)
     }
 
     var prompt: VibePrompt? { promptKey.flatMap(VibePrompt.init(rawValue:)) }
     var isEmbed: Bool { videoType == .embed }
+    var isUnavailable: Bool { moderationStatus == "unavailable" }
     /// The parsed public link, for embeds.
     var embedLink: EmbedLink? { embedURL.flatMap { EmbedLink.parse($0.absoluteString) } }
 
@@ -84,5 +91,6 @@ struct ProfileVideo: Codable, Identifiable, Hashable, Sendable {
         case promptKey = "prompt_key"
         case meMarkerX = "me_marker_x"
         case meMarkerY = "me_marker_y"
+        case moderationStatus = "moderation_status"
     }
 }

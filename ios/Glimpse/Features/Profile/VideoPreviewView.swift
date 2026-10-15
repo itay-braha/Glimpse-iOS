@@ -93,6 +93,13 @@ struct VideoPreviewView: View {
 
     private var tools: some View {
         VStack(spacing: 12) {
+            if video.isUnavailable, let link = video.embedLink {
+                Label("This \(link.platform.name) post was deleted, made private or expired, so others can't see it. Remove it and add a fresh moment.", systemImage: "eye.slash.fill")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(12)
+                    .background(Palette.pink.opacity(0.85), in: .rect(cornerRadius: 14))
+            }
             if let errorMessage { ErrorText(errorMessage) }
             RecencyBadge(video: video)
             HStack(spacing: 10) {

@@ -9,6 +9,17 @@ struct AppNotification: Codable, Identifiable, Hashable, Sendable {
         case replyNudge = "reply_nudge"
         case moderation
         case verification
+        case secondChance = "second_chance"
+        case vibeCheck = "vibe_check"
+        /// A linked Instagram/TikTok post was deleted or expired and is hidden.
+        case videoUnavailable = "video_unavailable"
+        /// A kind this build doesn't know yet; never breaks the whole list.
+        case other
+
+        init(from decoder: any Decoder) throws {
+            let raw = try decoder.singleValueContainer().decode(String.self)
+            self = Kind(rawValue: raw) ?? .other
+        }
     }
 
     let id: UUID

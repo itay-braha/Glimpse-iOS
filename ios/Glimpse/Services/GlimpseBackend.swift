@@ -22,6 +22,8 @@ protocol GlimpseBackend: AnyObject, Sendable {
     func deleteVideo(_ video: ProfileVideo) async throws
     /// Links a public Instagram / TikTok post. The server validates and canonicalizes the URL.
     func addEmbed(_ link: EmbedLink, promptKey: String?) async throws -> ProfileVideo
+    /// Silent signal from a viewer's phone: this linked post showed nothing.
+    func reportEmbedUnplayable(_ videoID: UUID) async
     /// Persists clip order; the first clip is the cover.
     func reorderVideos(_ ids: [UUID]) async throws
     func updateLocation(latitude: Double, longitude: Double) async throws

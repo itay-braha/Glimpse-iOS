@@ -53,7 +53,7 @@ struct FeedCardView: View {
             if let link = video?.embedLink {
                 // Linked post: framed above the name block so the platform's own
                 // player and captions stay readable and tappable.
-                EmbedStage(link: link, isActive: isActive)
+                EmbedStage(link: link, isActive: isActive, videoID: video?.id)
                     .id(video?.id)
                     .padding(.top, insets.top + (profile.videos.count > 1 ? 78 : 64))
                     .padding(.horizontal, 30)

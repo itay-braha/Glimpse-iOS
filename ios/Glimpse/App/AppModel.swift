@@ -160,6 +160,8 @@ final class AppModel {
         case "liked_you":
             selectedTab = .connections
             showLikesYou = true
+        case "video_unavailable":
+            selectedTab = .profile
         default:
             guard let matchID else { return }
             Task {

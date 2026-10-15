@@ -183,13 +183,18 @@ actor DemoBackend: GlimpseBackend {
         return video
     }
 
-    func deleteVideo(_ video: ProfileVideo) {
+    func deleteVideo(_ video: ProfileVideo) throws {
+        if !video.isEmbed, !videos.contains(where: { !$0.isEmbed && $0.id != video.id }) {
+            throw GlimpseError.lastHostedClip
+        }
         videos.removeAll { $0.id == video.id }
         profile?.isOnboarded = !videos.isEmpty
     }
 
     func addEmbed(_ link: EmbedLink, promptKey: String?) async throws -> ProfileVideo {
         try await Task.sleep(for: .milliseconds(500))
+        if EmbedLink.isStory(link.canonicalURL.absoluteString) { throw GlimpseError.storyLink }
+        guard videos.contains(where: { !$0.isEmbed }) else { throw GlimpseError.hostedFirst }
         if videos.contains(where: { $0.source == link.platform.source && $0.embedURL == link.canonicalURL }) {
             throw GlimpseError.videoAlreadyAdded
         }
@@ -204,10 +209,13 @@ actor DemoBackend: GlimpseBackend {
             importedAt: .now,
             promptKey: promptKey
         )
-        videos.insert(video, at: 0)
+        // Links always sort after own clips, so the cover is never a link.
+        videos.append(video)
         profile?.isOnboarded = true
         return video
     }
+
+    func reportEmbedUnplayable(_ videoID: UUID) {}
 
     // MARK: Discovery
 

@@ -72,8 +72,8 @@ enum DemoData {
         [
             video(1, source: .upload, importedDaysAgo: 3, now: now),
             video(2, source: .native, importedDaysAgo: 12, now: now),
-            embed(90, platform: .instagram, importedDaysAgo: 20, now: now),
             video(4, source: .upload, importedDaysAgo: 104, now: now),
+            embed(90, platform: .instagram, importedDaysAgo: 20, now: now),
         ]
     }
 

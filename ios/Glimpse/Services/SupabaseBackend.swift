@@ -182,8 +182,16 @@ final class SupabaseBackend: GlimpseBackend {
         try? await client.auth.signOut(scope: .local)
     }
 
+    func reportEmbedUnplayable(_ videoID: UUID) async {
+        _ = try? await client.rpc("report_embed_unplayable", params: ["p_video": videoID.uuidString]).execute()
+    }
+
     func deleteVideo(_ video: ProfileVideo) async throws {
-        try await client.from("profile_videos").delete().eq("id", value: video.id.uuidString).execute()
+        do {
+            try await client.from("profile_videos").delete().eq("id", value: video.id.uuidString).execute()
+        } catch let error as PostgrestError where error.message == "last_hosted" {
+            throw GlimpseError.lastHostedClip
+        }
         let paths = [video.storagePath, video.thumbnailPath].compactMap { $0 }
         guard !paths.isEmpty else { return }
         _ = try? await client.functions.invoke(
@@ -202,6 +210,8 @@ final class SupabaseBackend: GlimpseBackend {
             switch error.message {
             case "invalid_embed_url": throw GlimpseError.invalidEmbedLink
             case "already_added": throw GlimpseError.videoAlreadyAdded
+            case "story_link": throw GlimpseError.storyLink
+            case "hosted_first": throw GlimpseError.hostedFirst
             default: throw error
             }
         }

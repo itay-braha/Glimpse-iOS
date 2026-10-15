@@ -11,7 +11,9 @@ struct FirstVideoView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 26) {
                     GlimpseOfYouHeader()
-                    VideoHubOptions { route = $0 }
+                    // The first moment is always one Glimpse hosts, so a profile can't
+                    // go empty if a linked post later disappears.
+                    VideoHubOptions(canLink: false) { route = $0 }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 8)
@@ -34,6 +36,8 @@ struct FirstVideoView: View {
                 AddVideoDestination(route: route) { _ in
                     self.route = nil
                     Task { await app.refreshProfile() }
+                } onSwitch: { next in
+                    self.route = next
                 }
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
