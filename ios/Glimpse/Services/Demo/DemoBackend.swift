@@ -397,7 +397,7 @@ actor DemoBackend: GlimpseBackend {
             guard frozen.intersection(active).subtracting([matchID]).count < freezeAllowance else {
                 throw GlimpseError.freezeLimit
             }
-            immune.insert(matchID)
+            frozen.insert(matchID)
         } else {
             frozen.remove(matchID)
         }
@@ -499,8 +499,10 @@ actor DemoBackend: GlimpseBackend {
             return state
         }
         let match = matches.first { $0.matchID == matchID }
-        let mostRecent = matches.max { $0.lastActivity < $1.lastActivity }?.matchID == matchID
         let messageCount = match?.messageCount ?? 0
+        // Showcase: the most recent established conversation has been green-lit.
+        let mostRecent = messageCount >= 5
+            && matches.filter { $0.messageCount >= 5 }.max { $0.lastActivity < $1.lastActivity }?.matchID == matchID
         let criteria = VibeCriteria(
             eligible: mostRecent || messageCount >= 20,
             messages: messageCount,
@@ -577,7 +579,7 @@ actor DemoBackend: GlimpseBackend {
         vibeStates[matchID]?.vibeVerified = verified
         if verified {
             vibeStates[matchID]?.immunityUntil = Date.now.addingTimeInterval(7 * 86_400)
-            frozen.insert(matchID)
+            immune.insert(matchID)
         }
         return verified
     }

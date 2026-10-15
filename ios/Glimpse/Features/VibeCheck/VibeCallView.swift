@@ -133,7 +133,7 @@ struct VibeCallView: View {
                 }
 
             VStack(spacing: 0) {
-                HStack(alignment: .top) {
+                HStack {
                     Spacer()
                     Text(model.clockText)
                         .font(.system(size: 34, weight: .heavy, design: .rounded))
@@ -146,7 +146,11 @@ struct VibeCallView: View {
                         .accessibilityLabel("\(model.secondsLeft) seconds left")
                     Spacer()
                 }
-                .overlay(alignment: .topTrailing) {
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+
+                HStack {
+                    Spacer()
                     Button {
                         reportAfterEnd = true
                         model.end()
@@ -161,7 +165,7 @@ struct VibeCallView: View {
                     .accessibilityLabel("End now and report")
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 8)
+                .padding(.top, 10)
 
                 Spacer()
 

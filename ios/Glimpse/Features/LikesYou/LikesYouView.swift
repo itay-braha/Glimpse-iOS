@@ -103,7 +103,7 @@ struct LikesYouView: View {
                         }
                     } label: {
                         Label(
-                            (model.likes.freeRevealsLeft ?? 0) > 0 ? "Reveal 1 free" : "Next free reveal tomorrow",
+                            (model.likes.freeRevealsLeft ?? 0) > 0 ? "Reveal 1 free" : "Revealed today",
                             systemImage: "eye.fill"
                         )
                     }

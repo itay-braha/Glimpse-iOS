@@ -93,7 +93,7 @@ jobs:
       - name: Single-screen screenshots and feed video
         if: always()
         run: |
-          scripts/ci-screenshots.sh "${{ steps.sim.outputs.udid }}" \
+          bash scripts/ci-screenshots.sh "${{ steps.sim.outputs.udid }}" \
             ios/.derived/Build/Products/Debug-iphonesimulator/Glimpse.app screenshots || true
 
       - uses: actions/upload-artifact@v4
