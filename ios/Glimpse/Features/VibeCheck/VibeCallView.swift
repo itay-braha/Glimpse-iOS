@@ -85,6 +85,9 @@ struct VibeCallView: View {
 
             Spacer(minLength: 0)
 
+            SafetyNotice(isProtected: model.captureProtected, agreed: $model.agreedToSafetyRecording)
+                .disabled(model.meReady)
+
             Button {
                 model.markReady()
             } label: {
@@ -95,10 +98,11 @@ struct VibeCallView: View {
                     }
                 } else {
                     Text(model.meReady ? "Waiting for \(model.match.displayName)…" : "I'm ready")
+                        .accessibilityIdentifier("vibe.ready")
                 }
             }
             .buttonStyle(.glimpse)
-            .disabled(model.meReady)
+            .disabled(model.meReady || !model.agreedToSafetyRecording)
         }
         .padding(20)
     }
@@ -108,6 +112,14 @@ struct VibeCallView: View {
         if let client = model.client {
             RTCVideoView(mirrored: true) { client.renderLocal(to: $0) }
         } else {
+            CaptureProtected {
+                demoLocalPreview
+            }
+        }
+    }
+
+    private var demoLocalPreview: some View {
+        Group {
             ZStack {
                 Palette.seededGradient(app.profile?.displayName ?? "You")
                 VStack(spacing: 8) {
@@ -199,6 +211,14 @@ struct VibeCallView: View {
         if let client = model.client {
             RTCVideoView { client.renderRemote(to: $0) }
         } else {
+            CaptureProtected {
+                demoRemoteVideo
+            }
+        }
+    }
+
+    private var demoRemoteVideo: some View {
+        Group {
             ZStack {
                 Palette.seededGradient(model.match.displayName)
                 Text(String(model.match.displayName.prefix(1)))
@@ -278,5 +298,37 @@ private struct IcebreakerCard: View {
         .buttonStyle(.plain)
         .accessibilityHint("Shows another icebreaker")
         .animation(.snappy, value: text)
+    }
+}
+
+/// The lobby's promise and consent: nothing can be captured, and a private
+/// safety recording exists only for reports.
+private struct SafetyNotice: View {
+    let isProtected: Bool
+    @Binding var agreed: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(
+                isProtected
+                    ? "Screenshots and screen recordings of this call come out black, and any attempt is flagged."
+                    : "Screenshots and screen recordings are detected: your video pauses and they're flagged.",
+                systemImage: "eye.slash.fill"
+            )
+            .accessibilityIdentifier(isProtected ? "vibe.captureProtected" : "vibe.captureDetected")
+            Label(
+                "For safety, each phone keeps a private recording of its own camera and mic for 30 days. Nobody watches it unless one of you reports this call, and then only Glimpse's safety team.",
+                systemImage: "lock.shield.fill"
+            )
+            Toggle("I agree", isOn: $agreed)
+                .tint(Palette.mint)
+                .font(.subheadline.weight(.semibold))
+                .accessibilityIdentifier("vibe.agree")
+        }
+        .font(.footnote)
+        .foregroundStyle(Palette.textSecondary)
+        .padding(14)
+        .background(Palette.surface, in: .rect(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Palette.stroke))
     }
 }

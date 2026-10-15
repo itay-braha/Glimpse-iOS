@@ -63,6 +63,7 @@ enum LegalDocument: String, Identifiable, CaseIterable {
     ## What we collect
     **Account:** your phone number (to verify you're a real person) and the profile details you enter.
     **Content:** videos you record or import, and messages you send.
+    **Vibe Check safety recordings:** during a 3-Minute Vibe Check, each phone records what its own camera and microphone send. You agree to this before every call. Recordings are stored privately for 30 days and deleted after that. Nobody watches them unless one of you reports the call; then only Glimpse's safety team does, and they're kept until the report is closed. Screenshots and screen-recording attempts during a call are logged.
     **Approximate location:** rounded to about 1 km, used only to show people nearby and distances. Your exact location is never stored.
     **Device integrity:** Apple DeviceCheck signals that help keep banned accounts off Glimpse. These don't identify you personally.
     **Usage and diagnostics:** basic in-app events and crash reports, used to keep Glimpse working.
@@ -71,10 +72,10 @@ enum LegalDocument: String, Identifiable, CaseIterable {
     To run your profile, show you people, enforce the 20-connection limit, keep the community safe, send the notifications you allow, and improve the app. We do not sell your personal information and we do not show third-party ads.
 
     ## Who can see what
-    Your profile and videos are visible to people Glimpse shows you to and to your matches. Messages are visible only to you and the person you're talking to. Reports you file are confidential.
+    Your profile and videos are visible to people Glimpse shows you to and to your matches. Messages are visible only to you and the person you're talking to. Vibe Check calls can't be screenshotted or screen-recorded inside Glimpse, and their safety recordings are never shown to the other person or anyone else outside the safety team. Reports you file are confidential.
 
     ## Service providers
-    We use Supabase to host data and Apple for push notifications, DeviceCheck and payments. If you connect Instagram, we receive the videos you choose to import from Meta.
+    We use Supabase to host data and Apple for push notifications, DeviceCheck and payments. If you link a public Instagram or TikTok post, it plays through that platform's own player, and tapping it can take you there.
 
     ## Retention and deletion
     Deleting your account removes your profile, videos, messages and matches. Limited safety records (for example, that a device was banned) may be kept to prevent abuse.

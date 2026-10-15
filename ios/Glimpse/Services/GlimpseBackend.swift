@@ -87,6 +87,10 @@ protocol GlimpseBackend: AnyObject, Sendable {
     func vibeSubmitResult(matchID: UUID, outcome: VibeOutcome) async throws -> Bool
     func vibeIceServers(matchID: UUID) async throws -> [IceServerConfig]
     func openVibeSignaling(matchID: UUID) async -> VibeSignalChannel
+    /// Uploads this phone's safety recording of a call (kept 30 days; opened only if the call is reported).
+    func uploadVibeRecording(matchID: UUID, fileURL: URL, startedAt: Date) async throws
+    /// A screenshot or screen-recording attempt during a call, for the safety team.
+    func logVibeCapture(matchID: UUID, kind: String) async
 
     // MARK: Notifications
     func notifications() async throws -> [AppNotification]

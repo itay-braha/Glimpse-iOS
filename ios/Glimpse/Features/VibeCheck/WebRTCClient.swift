@@ -16,9 +16,15 @@ final class WebRTCClient: NSObject, RTCPeerConnectionDelegate, @unchecked Sendab
     var onLocalCandidate: (@Sendable (_ sdp: String, _ mLineIndex: Int32, _ mid: String?) -> Void)?
     var onConnectionChange: (@Sendable (_ connected: Bool) -> Void)?
     var onRemoteVideo: (@Sendable () -> Void)?
+    /// Every frame our camera sends into the call (for the safety recording).
+    var onLocalFrame: (@Sendable (RTCVideoFrame) -> Void)? {
+        get { frameTap.onFrame }
+        set { frameTap.onFrame = newValue }
+    }
 
     private let peerConnection: RTCPeerConnection
     private let capturer: RTCCameraVideoCapturer
+    private let frameTap: FrameTap
     private let localVideoTrack: RTCVideoTrack
     private let localAudioTrack: RTCAudioTrack
     private var remoteVideoTrack: RTCVideoTrack?
@@ -54,7 +60,8 @@ final class WebRTCClient: NSObject, RTCPeerConnectionDelegate, @unchecked Sendab
         let audioSource = Self.factory.audioSource(with: RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil))
         localAudioTrack = Self.factory.audioTrack(with: audioSource, trackId: "glimpse-audio")
         let videoSource = Self.factory.videoSource()
-        capturer = RTCCameraVideoCapturer(delegate: videoSource)
+        frameTap = FrameTap(source: videoSource)
+        capturer = RTCCameraVideoCapturer(delegate: frameTap)
         localVideoTrack = Self.factory.videoTrack(with: videoSource, trackId: "glimpse-video")
 
         super.init()
@@ -199,5 +206,20 @@ final class WebRTCClient: NSObject, RTCPeerConnectionDelegate, @unchecked Sendab
         if let track = transceiver.receiver.track as? RTCVideoTrack {
             adoptRemoteTrack(track)
         }
+    }
+}
+
+/// Passes camera frames to WebRTC and, alongside, to the safety recorder.
+private final class FrameTap: NSObject, RTCVideoCapturerDelegate, @unchecked Sendable {
+    let source: RTCVideoSource
+    var onFrame: (@Sendable (RTCVideoFrame) -> Void)?
+
+    init(source: RTCVideoSource) {
+        self.source = source
+    }
+
+    func capturer(_ capturer: RTCVideoCapturer, didCapture frame: RTCVideoFrame) {
+        source.capturer(capturer, didCapture: frame)
+        onFrame?(frame)
     }
 }

@@ -161,7 +161,15 @@ final class FlowTests: XCTestCase {
 
         let ready = app.buttons["I'm ready"]
         XCTAssertTrue(ready.waitForExistence(timeout: 10))
-        snap("3-5 Lobby")
+        // Nobody joins without agreeing to the private safety recording.
+        XCTAssertFalse(ready.isEnabled)
+        let agree = app.switches["vibe.agree"]
+        XCTAssertTrue(agree.waitForExistence(timeout: 5))
+        agree.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
+        XCTAssertTrue(ready.isEnabled)
+        // The call's video sits in the layer iOS leaves out of screenshots and recordings.
+        XCTAssertTrue(app.descendants(matching: .any)["vibe.captureProtected"].exists)
+        snap("3-5 Lobby: no capture, safety recording agreed")
         ready.tap()
 
         XCTAssertTrue(app.buttons["End now and report"].waitForExistence(timeout: 15))
@@ -366,11 +374,17 @@ final class FlowTests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [hearted], timeout: 5), .completed)
         snap("8-2 Double-tap: a heart")
 
-        last.press(forDuration: 1.0)
-        let reply = app.buttons["Reply"]
-        XCTAssertTrue(reply.waitForExistence(timeout: 5))
-        snap("8-3 Hold: react, reply, copy")
-        reply.tap()
+        last.press(forDuration: 1.2)
+        // Menu items surface as buttons or menu items depending on the iOS version.
+        let reply = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'Reply'")).firstMatch
+        if reply.waitForExistence(timeout: 5) {
+            snap("8-3 Hold: react, reply, copy")
+            reply.tap()
+        } else {
+            snap("8-3 Hold: react, reply, copy")
+            app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)).tap()
+            last.swipeRight()
+        }
 
         XCTAssertTrue(app.descendants(matching: .any)["chat.replyBar"].waitForExistence(timeout: 5))
         // Reply focuses the message box.

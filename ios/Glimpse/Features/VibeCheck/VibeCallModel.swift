@@ -39,6 +39,10 @@ final class VibeCallModel {
     /// They are recording, or just took a screenshot: we stop sending video.
     private(set) var remoteCaptureActive = false
     var icebreakerIndex = 0
+    /// Agreed to the private safety recording (required to join).
+    var agreedToSafetyRecording = false
+    /// Both videos are excluded from screenshots/recordings on this iOS version.
+    let captureProtected = SecureCanvas(frame: .zero).isProtected
 
     private(set) var client: WebRTCClient?
     private let backend: any GlimpseBackend
@@ -50,6 +54,7 @@ final class VibeCallModel {
     private var screenshotObserver: (any NSObjectProtocol)?
     private var offerSent = false
     private var endsAt: Date?
+    private var recorder: VibeSafetyRecorder?
 
     var isDemo: Bool { backend.isDemo }
 
@@ -104,7 +109,7 @@ final class VibeCallModel {
 
     /// "I'm ready": announced until the other side answers, so late joiners still see it.
     func markReady() {
-        guard !meReady else { return }
+        guard !meReady, agreedToSafetyRecording else { return }
         meReady = true
         readyPingTask = Task { [weak self] in
             while let self, !Task.isCancelled, !self.otherReady || !self.offerSent && self.isOfferer {
@@ -125,8 +130,10 @@ final class VibeCallModel {
         if let screenshotObserver {
             NotificationCenter.default.removeObserver(screenshotObserver)
         }
+        client?.onLocalFrame = nil
         client?.close()
         client = nil
+        finishRecording()
         let channel = signaling
         signaling = nil
         Task {
@@ -222,6 +229,7 @@ final class VibeCallModel {
         guard phase != .live, phase != .ended else { return }
         phase = .live
         readyPingTask?.cancel()
+        startRecording()
         do {
             let clock = try await backend.vibeMarkStarted(matchID: match.matchID)
             // Translate the server's end time into local time (clock skew safe).
@@ -260,6 +268,10 @@ final class VibeCallModel {
         guard capturing != localCaptureActive else { return }
         localCaptureActive = capturing
         Task { await send(VibeSignal(kind: .capture, sender: "", flag: capturing)) }
+        if capturing {
+            let matchID = match.matchID
+            Task { await backend.logVibeCapture(matchID: matchID, kind: "screen_recording") }
+        }
     }
 
     private func observeScreenshots() {
@@ -267,7 +279,9 @@ final class VibeCallModel {
             forName: UIApplication.userDidTakeScreenshotNotification, object: nil, queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
-                await self?.send(VibeSignal(kind: .screenshot, sender: ""))
+                guard let self else { return }
+                await self.send(VibeSignal(kind: .screenshot, sender: ""))
+                await self.backend.logVibeCapture(matchID: self.match.matchID, kind: "screenshot")
             }
         }
     }
@@ -280,6 +294,30 @@ final class VibeCallModel {
             guard let self, self.phase == .live else { return }
             self.remoteCaptureActive = false
             self.client?.setVideoEnabled(true)
+        }
+    }
+
+    // MARK: Safety recording
+
+    /// Records what this phone's camera and microphone send, from the moment the call is live.
+    private func startRecording() {
+        guard let client, recorder == nil else { return }
+        let recorder = VibeSafetyRecorder()
+        recorder.start()
+        client.onLocalFrame = { @Sendable frame in recorder.append(frame) }
+        self.recorder = recorder
+    }
+
+    /// Finishes the file and queues it for upload (retried on later launches if needed).
+    private func finishRecording() {
+        guard let recorder else { return }
+        self.recorder = nil
+        let matchID = match.matchID
+        let backend = backend
+        Task { @MainActor in
+            guard let url = await recorder.finish() else { return }
+            VibeRecordingUploads.enqueue(url, matchID: matchID, startedAt: recorder.startedAt)
+            await VibeRecordingUploads.uploadPending(using: backend)
         }
     }
 

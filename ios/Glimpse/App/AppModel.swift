@@ -152,6 +152,7 @@ final class AppModel {
         DiagnosticsReporter.backend = backend
         store.startListening(backend: backend)
         track("app_open")
+        Task { await VibeRecordingUploads.uploadPending(using: backend) }
 
         if launch.screen == .alerts {
             askForAlerts = true

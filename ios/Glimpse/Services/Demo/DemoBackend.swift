@@ -535,6 +535,11 @@ actor DemoBackend: GlimpseBackend {
         }
     }
 
+    /// Demo calls have no camera, so there's nothing to keep.
+    func uploadVibeRecording(matchID: UUID, fileURL: URL, startedAt: Date) {}
+
+    func logVibeCapture(matchID: UUID, kind: String) {}
+
     func setPushScope(_ scope: PushScope) {
         profile?.pushScope = scope
     }

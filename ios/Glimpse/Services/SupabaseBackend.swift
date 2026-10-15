@@ -131,9 +131,12 @@ final class SupabaseBackend: GlimpseBackend {
     }
 
     /// Asks the media function for a one-time upload URL, then PUTs the bytes there.
-    private func upload(fileURL: URL? = nil, data: Data? = nil, kind: String, ext: String, bytes: Int? = nil) async throws -> String {
+    private func upload(
+        fileURL: URL? = nil, data: Data? = nil, kind: String, ext: String, bytes: Int? = nil,
+        limit: Int = VideoCompressor.maxBytes
+    ) async throws -> String {
         let size = bytes ?? data?.count
-        if let size, size > VideoCompressor.maxBytes { throw GlimpseError.videoTooLarge }
+        if let size, size > limit { throw GlimpseError.videoTooLarge }
         let ticket: UploadTicket = try await client.functions.invoke(
             "media",
             options: FunctionInvokeOptions(body: UploadTicketRequest(kind: kind, ext: ext, bytes: size))
@@ -496,6 +499,19 @@ final class SupabaseBackend: GlimpseBackend {
     }
 
     // MARK: 3-Minute Vibe Check
+
+    func uploadVibeRecording(matchID: UUID, fileURL: URL, startedAt: Date) async throws {
+        let bytes = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? nil
+        let path = try await upload(fileURL: fileURL, kind: "vibe", ext: "mp4", bytes: bytes, limit: 40 * 1024 * 1024)
+        try await client.rpc(
+            "vibe_register_recording",
+            params: VibeRecordingParams(match: matchID, path: path, startedAt: startedAt)
+        ).execute()
+    }
+
+    func logVibeCapture(matchID: UUID, kind: String) async {
+        _ = try? await client.rpc("vibe_log_capture", params: ["p_match": matchID.uuidString, "p_kind": kind]).execute()
+    }
 
     func vibeCheck(matchID: UUID) async throws -> VibeCheckState {
         try await client.rpc("get_vibe_check", params: ["p_match": matchID]).execute().value
@@ -873,6 +889,18 @@ private struct FeedEventsParams: Encodable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case events = "p_events"
+    }
+}
+
+private struct VibeRecordingParams: Encodable, Sendable {
+    let match: UUID
+    let path: String
+    let startedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case match = "p_match"
+        case path = "p_path"
+        case startedAt = "p_started_at"
     }
 }
 
