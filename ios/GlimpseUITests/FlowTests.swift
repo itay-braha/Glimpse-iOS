@@ -292,9 +292,9 @@ final class FlowTests: XCTestCase {
     func testFeedNavigation() {
         let app = XCUIApplication()
         continueAfterFailure = false
-        // 15-second clip time (UserDefaults via launch arguments) so the checks
-        // below never race the auto-advance on a slow simulator.
-        app.launchArguments = ["-demo", "-screen", "feed", "-showTips", "-glimpse.clipSeconds", "15"]
+        // 12-second clip time so the checks below never race the auto-advance on
+        // a slow simulator (15 s clips still leave a "+3s more").
+        app.launchArguments = ["-demo", "-screen", "feed", "-showTips", "-clipSeconds", "12"]
         app.launch()
 
         let gotIt = app.buttons["tips.done"]
@@ -384,7 +384,7 @@ final class FlowTests: XCTestCase {
         pause(1)
         snap("8-5 Sent with the quote; she reacted and answered")
 
-        incoming.allElementsBoundByIndex.first!.swipeRight()
+        incoming.allElementsBoundByIndex.last!.swipeRight()
         XCTAssertTrue(app.descendants(matching: .any)["chat.replyBar"].waitForExistence(timeout: 5))
         snap("8-6 Swipe a message right to reply")
     }

@@ -56,6 +56,9 @@ final class AppModel {
 
     init(launch: LaunchOptions = .current) {
         self.launch = launch
+        if let seconds = launch.clipSeconds {
+            UserDefaults.standard.set(seconds, forKey: PlaybackPreferences.clipSecondsKey)
+        }
         let config = launch.forceDemo ? nil : AppConfig.load()
         self.config = config
         if let config {
