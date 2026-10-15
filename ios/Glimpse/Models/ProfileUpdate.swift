@@ -9,6 +9,7 @@ struct ProfileUpdate: Codable, Sendable {
     var ageMin: Int
     var ageMax: Int
     var maxDistanceKm: Int
+    var flexibleDiscovery: Bool
 
     enum CodingKeys: String, CodingKey {
         case displayName = "display_name"
@@ -18,5 +19,6 @@ struct ProfileUpdate: Codable, Sendable {
         case ageMin = "age_min"
         case ageMax = "age_max"
         case maxDistanceKm = "max_distance_km"
+        case flexibleDiscovery = "flexible_discovery"
     }
 }

@@ -121,6 +121,7 @@ actor DemoBackend: GlimpseBackend {
         profile?.ageMin = update.ageMin
         profile?.ageMax = update.ageMax
         profile?.maxDistanceKm = update.maxDistanceKm
+        profile?.flexibleDiscovery = update.flexibleDiscovery
     }
 
     func updateVideoDetails(_ videoID: UUID, promptKey: String?, meMarker: CGPoint?) {
@@ -216,6 +217,13 @@ actor DemoBackend: GlimpseBackend {
     }
 
     func reportEmbedUnplayable(_ videoID: UUID) {}
+
+    /// Kept so tests can see what the feed reports.
+    private(set) var loggedFeedEvents: [FeedEvent] = []
+
+    func logFeedEvents(_ events: [FeedEvent]) {
+        loggedFeedEvents.append(contentsOf: events)
+    }
 
     // MARK: Discovery
 

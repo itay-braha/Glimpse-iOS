@@ -166,6 +166,14 @@ struct VideoFlowTests {
         #expect(EmbedHealth.looksUnavailable(text) == unavailable)
     }
 
+    @Test @MainActor func aDeadLinkIsDroppedForThisViewerOnce() {
+        let id = UUID()
+        let backend = DemoBackend(seeded: true)
+        EmbedHealth.shared.markDead(id, using: backend)
+        EmbedHealth.shared.markDead(id, using: backend)
+        #expect(EmbedHealth.shared.deadForMe.contains(id))
+    }
+
     @Test func uploadsKeepTheirSource() async throws {
         let backend = DemoBackend(seeded: true)
         let clip = RecordedClip(

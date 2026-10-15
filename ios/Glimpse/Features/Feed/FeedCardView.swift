@@ -17,10 +17,17 @@ struct FeedCardView: View {
     @State private var burstID = 0
     @State private var showMeMarker = false
     @State private var preferences = PlaybackPreferences.shared
+    @State private var health = EmbedHealth.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var video: ProfileVideo? {
-        profile.videos.indices.contains(videoIndex) ? profile.videos[videoIndex] : profile.videos.first
+        videos.indices.contains(videoIndex) ? videos[videoIndex] : videos.last
+    }
+
+    /// Clips this viewer can actually play: a linked post their player found dead
+    /// drops out on the spot (the hosted anchor clip always remains).
+    private var videos: [ProfileVideo] {
+        profile.videos.filter { !health.deadForMe.contains($0.id) }
     }
 
     var body: some View {
@@ -53,15 +60,19 @@ struct FeedCardView: View {
             if let link = video?.embedLink {
                 // Linked post: framed above the name block so the platform's own
                 // player and captions stay readable and tappable.
-                EmbedStage(link: link, isActive: isActive, videoID: video?.id)
-                    .id(video?.id)
-                    .padding(.top, insets.top + (profile.videos.count > 1 ? 78 : 64))
-                    .padding(.horizontal, 30)
-                    .padding(.bottom, insets.bottom + 240)
+                EmbedStage(link: link, isActive: isActive, videoID: video?.id) {
+                    FeedSignals.shared.record(.linkOpen, target: profile.id)
+                }
+                .id(video?.id)
+                // Clear of the header/capacity banner above and the action rail on the right.
+                .padding(.top, insets.top + 104)
+                .padding(.leading, 16)
+                .padding(.trailing, 88)
+                .padding(.bottom, insets.bottom + 236)
             }
 
             VStack(spacing: 0) {
-                if profile.videos.count > 1 {
+                if videos.count > 1 {
                     segments
                         .padding(.top, insets.top + 60)
                         .padding(.horizontal, 14)
@@ -78,6 +89,9 @@ struct FeedCardView: View {
 
             HeartBurst(trigger: burstID, reduceMotion: reduceMotion)
                 .allowsHitTesting(false)
+        }
+        .onChange(of: preferences.isMuted) { _, muted in
+            if isActive, !muted { FeedSignals.shared.record(.unmute, target: profile.id) }
         }
         .clipped()
         .task(id: "\(isActive)-\(videoIndex)") {
@@ -130,7 +144,7 @@ struct FeedCardView: View {
 
     private var segments: some View {
         HStack(spacing: 4) {
-            ForEach(profile.videos.indices, id: \.self) { index in
+            ForEach(videos.indices, id: \.self) { index in
                 Capsule()
                     .fill(index == videoIndex ? Palette.textPrimary : Palette.textPrimary.opacity(0.3))
                     .frame(height: 3)
@@ -141,6 +155,15 @@ struct FeedCardView: View {
 
     private var info: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if let note = profile.discoveryNote {
+                Label(note.text, systemImage: note.symbol)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Palette.textPrimary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Palette.violet.opacity(0.55), in: .capsule)
+                    .accessibilityIdentifier("discoveryNote")
+            }
             if let prompt = video?.prompt {
                 PromptSticker(prompt: prompt)
             }
@@ -200,9 +223,10 @@ struct FeedCardView: View {
     }
 
     private func step(_ delta: Int) {
-        guard profile.videos.count > 1 else { return }
-        let next = videoIndex + delta
-        videoIndex = min(max(next, 0), profile.videos.count - 1)
+        guard videos.count > 1 else { return }
+        let next = min(max(videoIndex + delta, 0), videos.count - 1)
+        if next > videoIndex { FeedSignals.shared.record(.clipNext, target: profile.id) }
+        videoIndex = next
     }
 
     private func like() {

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct FeedView: View {
     @Environment(AppModel.self) private var app
+    @Environment(\.scenePhase) private var scenePhase
     @State private var model = FeedModel()
     @State private var reportTarget: FeedProfile?
     @State private var capacityPrompt: FeedProfile?
@@ -79,6 +80,7 @@ struct FeedView: View {
             }
         }
         .task {
+            FeedSignals.shared.configure(app.backend)
             guard !model.hasLoaded else { return }
             await model.load(using: app.backend)
             if app.launch.screen == .match, let first = model.profiles.first {
@@ -86,6 +88,10 @@ struct FeedView: View {
             }
             await app.didBecomeReady()
         }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { FeedSignals.shared.flush() }
+        }
+        .onDisappear { FeedSignals.shared.flush() }
         .onChange(of: model.currentID) { _, newValue in
             model.visibleProfileChanged(to: newValue, using: app.backend)
         }

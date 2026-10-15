@@ -38,6 +38,8 @@ protocol GlimpseBackend: AnyObject, Sendable {
 
     // MARK: Discovery
     func fetchFeed(limit: Int) async throws -> [FeedProfile]
+    /// Implicit signals (watch time, rewatch, unmute…) that personalize ranking. Best effort.
+    func logFeedEvents(_ events: [FeedEvent]) async
     func swipe(on userID: UUID, liked: Bool) async throws -> SwipeResult
     func capacityStatus() async throws -> CapacityStatus
     func likeQuota() async throws -> LikeQuota

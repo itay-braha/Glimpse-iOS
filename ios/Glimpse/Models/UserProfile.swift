@@ -15,6 +15,8 @@ struct UserProfile: Codable, Identifiable, Hashable, Sendable {
     var maxDistanceKm: Int?
     var isVerified: Bool?
     var verificationStatus: String?
+    /// Show people slightly outside the filters once everyone inside has been seen.
+    var flexibleDiscovery: Bool?
 
     var age: Int? {
         guard let date = BirthdateFormat.date(from: birthdate) else { return nil }
@@ -35,5 +37,6 @@ struct UserProfile: Codable, Identifiable, Hashable, Sendable {
         case maxDistanceKm = "max_distance_km"
         case isVerified = "is_verified"
         case verificationStatus = "verification_status"
+        case flexibleDiscovery = "flexible_discovery"
     }
 }

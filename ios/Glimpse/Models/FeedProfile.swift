@@ -10,6 +10,8 @@ struct FeedProfile: Codable, Identifiable, Hashable, Sendable {
     /// Approximate distance, rounded to whole kilometres (nil when either side has no location).
     var distanceKm: Int?
     var videos: [ProfileVideo]
+    /// Why this card is here when it's outside the viewer's own filters.
+    var discoveryNote: DiscoveryNote?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -20,5 +22,6 @@ struct FeedProfile: Codable, Identifiable, Hashable, Sendable {
         case isVerified = "is_verified"
         case distanceKm = "distance_km"
         case videos
+        case discoveryNote = "discovery_note"
     }
 }

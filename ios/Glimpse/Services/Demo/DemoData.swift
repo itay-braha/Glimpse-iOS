@@ -101,7 +101,10 @@ enum DemoData {
                 videos: [
                     video(index * 2, source: index.isMultiple(of: 3) ? .native : .upload, importedDaysAgo: Double(index % 5) + 1, now: now),
                     video(index * 2 + 1, source: index.isMultiple(of: 2) ? .upload : .native, importedDaysAgo: Double(index % 4) * 6 + 9, now: now),
-                ] + (index == 0 ? [embed(91, platform: .tiktok, importedDaysAgo: 6, now: now)] : [])
+                ] + (index == 0 ? [embed(91, platform: .tiktok, importedDaysAgo: 6, now: now)] : []),
+                // Like the server: widened suggestions come last, and say so.
+                discoveryNote: index == people.count - 1 ? .widerDistance
+                    : index == people.count - 2 ? .secondLook : nil
             )
         }
     }

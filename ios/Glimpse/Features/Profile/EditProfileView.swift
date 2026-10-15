@@ -11,6 +11,7 @@ struct EditProfileView: View {
     @State private var ageMin: Int
     @State private var ageMax: Int
     @State private var maxDistanceKm: Double
+    @State private var flexibleDiscovery: Bool
     @State private var isSaving = false
     @State private var errorMessage: String?
 
@@ -23,6 +24,7 @@ struct EditProfileView: View {
         _ageMin = State(initialValue: profile.ageMin)
         _ageMax = State(initialValue: profile.ageMax)
         _maxDistanceKm = State(initialValue: Double(profile.maxDistanceKm ?? 50))
+        _flexibleDiscovery = State(initialValue: profile.flexibleDiscovery ?? true)
     }
 
     var body: some View {
@@ -62,6 +64,13 @@ struct EditProfileView: View {
                     Stepper("To \(ageMax)", value: $ageMax, in: ageMin...99)
                 }
 
+                Section {
+                    Toggle("Show people slightly outside my filters", isOn: $flexibleDiscovery)
+                        .tint(Palette.mint)
+                } footer: {
+                    Text("When you've seen everyone inside your filters, Glimpse shows people up to twice as far or 2 years either side, labelled on their card. Their own filters always apply.")
+                }
+
                 if let errorMessage {
                     Section { ErrorText(errorMessage) }
                 }
@@ -94,7 +103,8 @@ struct EditProfileView: View {
             interestedIn: Gender.allCases.filter { interestedIn.contains($0) },
             ageMin: ageMin,
             ageMax: ageMax,
-            maxDistanceKm: Int(maxDistanceKm)
+            maxDistanceKm: Int(maxDistanceKm),
+            flexibleDiscovery: flexibleDiscovery
         )
         do {
             try await app.backend.updateProfile(update)

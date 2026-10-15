@@ -36,7 +36,14 @@ final class FeedModel {
 
     private var decidedIDs: Set<UUID> = []
     private var lastVisibleID: UUID?
+    private var visibleSince = Date.now
     private var isFetchingMore = false
+
+    /// How many profiles ahead are prepared: hosted clips cached, linked posts
+    /// checked in the background (dead ones dropped before anyone sees them).
+    static let lookahead = 5
+    /// Linked-post players warmed ahead (each is a live web view).
+    static let embedLookahead = 3
 
     func load(using backend: any GlimpseBackend) async {
         isLoading = true
@@ -60,7 +67,9 @@ final class FeedModel {
             profiles = fresh
             currentID = fresh.first?.id
             lastVisibleID = currentID
+            visibleSince = .now
             errorMessage = nil
+            prepare(from: 0, using: backend)
         } catch {
             errorMessage = GlimpseError.describe(error)
         }
@@ -74,14 +83,20 @@ final class FeedModel {
 
     /// Scrolling past someone without liking them records a pass, so nobody is shown twice.
     func visibleProfileChanged(to id: UUID?, using backend: any GlimpseBackend) {
-        if let previous = lastVisibleID, previous != id, !decidedIDs.contains(previous) {
-            decidedIDs.insert(previous)
-            Task { _ = try? await backend.swipe(on: previous, liked: false) }
+        if let previous = lastVisibleID, previous != id {
+            recordWatch(of: previous)
+            if !decidedIDs.contains(previous) {
+                decidedIDs.insert(previous)
+                Task { _ = try? await backend.swipe(on: previous, liked: false) }
+            }
         }
         lastVisibleID = id
-        prefetch(after: id)
+        visibleSince = .now
 
-        if let id, let index = profiles.firstIndex(where: { $0.id == id }), index >= profiles.count - 3 {
+        guard let id, let index = profiles.firstIndex(where: { $0.id == id }) else { return }
+        prepare(from: index + 1, using: backend)
+        // Keep a full look-ahead buffer so the next profiles are always ready.
+        if index >= profiles.count - Self.lookahead {
             Task { await loadMore(using: backend) }
         }
     }
@@ -96,6 +111,7 @@ final class FeedModel {
         guard !decidedIDs.contains(profile.id) else { return .failed }
         decidedIDs.insert(profile.id)
         likedIDs.insert(profile.id)
+        recordWatch(of: profile.id)
         do {
             let result = try await backend.swipe(on: profile.id, liked: true)
             if let remaining = result.likesRemaining {
@@ -187,6 +203,22 @@ final class FeedModel {
         guard !fresh.isEmpty else { return }
         await resolveMedia(for: fresh, using: backend)
         profiles.append(contentsOf: fresh)
+        if let current = currentID, let index = profiles.firstIndex(where: { $0.id == current }) {
+            prepare(from: index + 1, using: backend)
+        }
+    }
+
+    /// Watch time on a card: a "view" with its dwell, plus a "rewatch" when it
+    /// played well past one loop. Only for real dwell (not a fast flick past).
+    private func recordWatch(of id: UUID) {
+        let ms = Int(Date.now.timeIntervalSince(visibleSince) * 1000)
+        visibleSince = .now
+        guard ms >= 700 else { return }
+        FeedSignals.shared.record(.view, target: id, dwellMs: min(ms, 600_000))
+        let loop = profiles.first { $0.id == id }?.videos.first?.durationSeconds ?? 15
+        if Double(ms) > loop * 1000 * 1.6 {
+            FeedSignals.shared.record(.rewatch, target: id)
+        }
     }
 
     private func resolveMedia(for batch: [FeedProfile], using backend: any GlimpseBackend) async {
@@ -197,12 +229,23 @@ final class FeedModel {
         }
     }
 
-    private func prefetch(after id: UUID?) {
-        guard let id, let index = profiles.firstIndex(where: { $0.id == id }) else { return }
-        let upcoming = profiles.dropFirst(index + 1).prefix(2)
-        for profile in upcoming {
-            guard let path = profile.videos.first?.storagePath, let url = playableURLs[path], !url.isFileURL else { continue }
-            Task { await VideoCache.shared.prefetch(key: path, remote: url) }
+    /// Prepares the next profiles: the cover clip of the next 5 and every hosted
+    /// clip of the next 2 go into the video cache; linked posts of the next 3 get
+    /// a player warmed (and checked) in the background.
+    private func prepare(from start: Int, using backend: any GlimpseBackend) {
+        guard start < profiles.count else { return }
+        let upcoming = profiles[start...].prefix(Self.lookahead)
+        for (offset, profile) in upcoming.enumerated() {
+            let hosted = profile.videos.filter { !$0.isEmbed }
+            for video in offset < 2 ? hosted : Array(hosted.prefix(1)) {
+                guard let path = video.storagePath, let url = playableURLs[path], !url.isFileURL else { continue }
+                Task { await VideoCache.shared.prefetch(key: path, remote: url) }
+            }
+            if offset < Self.embedLookahead, !backend.isDemo {
+                for video in profile.videos where video.isEmbed {
+                    EmbedPrewarmer.shared.warm(video, using: backend)
+                }
+            }
         }
     }
 }

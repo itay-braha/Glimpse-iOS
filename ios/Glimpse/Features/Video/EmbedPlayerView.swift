@@ -2,53 +2,86 @@ import SwiftUI
 import WebKit
 
 /// Plays a public Instagram / TikTok post through the platform's official embed
-/// player, in a sandboxed web view:
-///   * non-persistent data store: no cookies or logins shared with Safari or the apps;
-///   * no script bridges into Glimpse;
-///   * any tap that leaves the player (profile, "View on Instagram", …) opens
-///     outside Glimpse, in the platform's app when installed.
-/// When the platform shows a viewer nothing (deleted, private or expired post),
-/// the app quietly tells the server; enough viewers hide the link. Demo builds
-/// show a stand-in instead of calling the platforms.
+/// player (see `EmbedLoader` for the sandbox). The feed warms players for the
+/// next few profiles, so this usually finds one already checked and ready. A
+/// player stays out of sight until the post has loaded; if the post is dead,
+/// viewers never see the platform's "unavailable" card (the card drops the clip),
+/// while owners do, so they know. Demo builds show a stand-in instead.
 struct EmbedPlayerView: View {
     let link: EmbedLink
     var isActive = true
-    /// Set for other people's videos, so an unplayable link can be reported.
+    /// Set for other people's videos (pooled, checked, reported if dead).
     var videoID: UUID?
 
     @Environment(AppModel.self) private var app
-    @State private var hasStarted = false
+    @State private var loader: EmbedLoader?
+
+    private var isOwnerPreview: Bool { videoID == nil }
 
     var body: some View {
         ZStack {
             Color.black
             if app.isDemo {
                 DemoEmbedStandIn(link: link)
-            } else if hasStarted {
-                EmbedWebView(link: link, isActive: isActive) {
-                    guard let videoID else { return }
-                    EmbedHealth.reportOnce(videoID, using: app.backend)
+            } else if let loader {
+                EmbedWebHost(webView: loader.webView)
+                    .opacity(loader.state == .ready || (isOwnerPreview && loader.state == .dead) ? 1 : 0)
+                if loader.state == .loading {
+                    ProgressView().tint(.white)
                 }
             } else {
                 ProgressView().tint(.white)
             }
         }
         .onChange(of: isActive, initial: true) { _, active in
-            // Load lazily: off-screen cards in the feed don't pull the platform's player.
-            if active { hasStarted = true }
+            // Off-screen cards don't create players; the feed's look-ahead warms them instead.
+            if active, loader == nil, !app.isDemo {
+                loader = EmbedPrewarmer.shared.loader(for: link, videoID: videoID, using: app.backend)
+            }
+            loader?.setPlaying(active)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(link.platform.name) video")
     }
 }
 
+/// Hosts a (possibly pre-warmed) web view; detaching it on teardown lets the
+/// same player move to whichever card shows it next.
+private struct EmbedWebHost: UIViewRepresentable {
+    let webView: WKWebView
+
+    func makeUIView(context: Context) -> UIView {
+        let container = UIView()
+        container.backgroundColor = .black
+        attach(to: container)
+        return container
+    }
+
+    func updateUIView(_ container: UIView, context: Context) {
+        if webView.superview !== container { attach(to: container) }
+    }
+
+    static func dismantleUIView(_ container: UIView, coordinator: ()) {
+        container.subviews.forEach { $0.removeFromSuperview() }
+    }
+
+    private func attach(to container: UIView) {
+        webView.removeFromSuperview()
+        webView.frame = container.bounds
+        webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        container.addSubview(webView)
+    }
+}
+
 /// "Instagram ↗": tells viewers that tapping leaves Glimpse, and does it.
 struct PlatformBadge: View {
     let link: EmbedLink
+    var onOpen: (() -> Void)?
     @Environment(\.openURL) private var openURL
 
     var body: some View {
         Button {
+            onOpen?()
             openURL(link.canonicalURL)
         } label: {
             HStack(spacing: 5) {
@@ -87,13 +120,14 @@ struct EmbedStage: View {
     let link: EmbedLink
     var isActive = true
     var videoID: UUID?
+    var onOpenLink: (() -> Void)?
 
     var body: some View {
         EmbedPlayerView(link: link, isActive: isActive, videoID: videoID)
             .clipShape(.rect(cornerRadius: 22))
             .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(.white.opacity(0.14)))
             .overlay(alignment: .topTrailing) {
-                PlatformBadge(link: link).padding(10)
+                PlatformBadge(link: link, onOpen: onOpenLink).padding(10)
             }
     }
 }
@@ -117,132 +151,6 @@ private struct DemoEmbedStandIn: View {
                     .foregroundStyle(.white.opacity(0.75))
                     .padding(.horizontal, 28)
             }
-        }
-    }
-}
-
-/// One silent report per video per app session.
-@MainActor
-enum EmbedHealth {
-    private static var reported: Set<UUID> = []
-
-    static func reportOnce(_ videoID: UUID, using backend: any GlimpseBackend) {
-        guard reported.insert(videoID).inserted else { return }
-        Task { await backend.reportEmbedUnplayable(videoID) }
-    }
-
-    /// Words the platforms' players show instead of a video.
-    static func looksUnavailable(_ pageText: String) -> Bool {
-        let text = pageText.lowercased()
-        return ["unavailable", "no longer available", "isn't available", "not available", "has been removed"]
-            .contains { text.contains($0) }
-    }
-}
-
-private struct EmbedWebView: UIViewRepresentable {
-    let link: EmbedLink
-    let isActive: Bool
-    let onUnplayable: () -> Void
-
-    func makeCoordinator() -> Coordinator { Coordinator(link: link, onUnplayable: onUnplayable) }
-
-    func makeUIView(context: Context) -> WKWebView {
-        let configuration = WKWebViewConfiguration()
-        configuration.websiteDataStore = .nonPersistent()
-        configuration.allowsInlineMediaPlayback = true
-        configuration.mediaTypesRequiringUserActionForPlayback = []
-        configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
-        configuration.defaultWebpagePreferences.preferredContentMode = .mobile
-
-        let view = WKWebView(frame: .zero, configuration: configuration)
-        view.navigationDelegate = context.coordinator
-        view.uiDelegate = context.coordinator
-        view.isOpaque = false
-        view.backgroundColor = .black
-        view.scrollView.backgroundColor = .black
-        view.scrollView.bounces = false
-        view.allowsLinkPreview = false
-        view.load(URLRequest(url: link.playerURL))
-        return view
-    }
-
-    func updateUIView(_ view: WKWebView, context: Context) {
-        if !isActive {
-            view.evaluateJavaScript("document.querySelectorAll('video').forEach(function (v) { v.pause(); })")
-        }
-    }
-
-    static func dismantleUIView(_ view: WKWebView, coordinator: Coordinator) {
-        view.stopLoading()
-        view.evaluateJavaScript("document.querySelectorAll('video').forEach(function (v) { v.pause(); })")
-    }
-
-    @MainActor
-    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
-        private let link: EmbedLink
-        private let onUnplayable: () -> Void
-
-        init(link: EmbedLink, onUnplayable: @escaping () -> Void) {
-            self.link = link
-            self.onUnplayable = onUnplayable
-        }
-
-        /// The player page itself answered "gone" (404/410). Network errors on the
-        /// viewer's side are never reported.
-        func webView(_ webView: WKWebView, decidePolicyFor response: WKNavigationResponse) async -> WKNavigationResponsePolicy {
-            if response.isForMainFrame, let http = response.response as? HTTPURLResponse, [404, 410].contains(http.statusCode) {
-                onUnplayable()
-            }
-            return .allow
-        }
-
-        /// The page loaded but shows the platform's "unavailable" card.
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            Task { [weak webView] in
-                try? await Task.sleep(for: .seconds(3))
-                guard let webView,
-                      let text = try? await webView.evaluateJavaScript("document.body ? document.body.innerText : ''") as? String
-                else { return }
-                if EmbedHealth.looksUnavailable(text) { self.onUnplayable() }
-            }
-        }
-
-        /// Hosts the player itself may use. Anything else, or any tap on a link,
-        /// leaves Glimpse.
-        private var playerHosts: [String] {
-            switch link.platform {
-            case .instagram: ["instagram.com", "cdninstagram.com", "facebook.com", "fbcdn.net"]
-            case .tiktok: ["tiktok.com", "tiktokcdn.com", "tiktokv.com", "ttwstatic.com"]
-            }
-        }
-
-        func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
-            guard let url = action.request.url else { return .cancel }
-            let host = url.host()?.lowercased() ?? ""
-            let isPlayerHost = playerHosts.contains { host == $0 || host.hasSuffix("." + $0) }
-            let isSubframe = action.targetFrame?.isMainFrame == false
-
-            if action.navigationType == .linkActivated || (!isPlayerHost && !isSubframe && url.scheme != "about") {
-                openOutside(url)
-                return .cancel
-            }
-            return .allow
-        }
-
-        /// `target=_blank` links: never open a second web view.
-        func webView(
-            _ webView: WKWebView,
-            createWebViewWith configuration: WKWebViewConfiguration,
-            for action: WKNavigationAction,
-            windowFeatures: WKWindowFeatures
-        ) -> WKWebView? {
-            if let url = action.request.url { openOutside(url) }
-            return nil
-        }
-
-        private func openOutside(_ url: URL) {
-            guard url.scheme == "https" else { return }
-            UIApplication.shared.open(url)
         }
     }
 }

@@ -223,6 +223,11 @@ final class SupabaseBackend: GlimpseBackend {
         try await client.rpc("get_feed", params: ["p_limit": limit]).execute().value
     }
 
+    func logFeedEvents(_ events: [FeedEvent]) async {
+        guard !events.isEmpty else { return }
+        _ = try? await client.rpc("log_feed_events", params: FeedEventsParams(events: events)).execute()
+    }
+
     func swipe(on userID: UUID, liked: Bool) async throws -> SwipeResult {
         try await mapLimits {
             try await client.rpc("swipe", params: SwipeParams(target: userID, liked: liked)).execute().value
@@ -771,6 +776,14 @@ private struct IceServersResponse: Decodable, Sendable {
 
 private struct PurchaseResponse: Decodable, Sendable {
     let plan: String
+}
+
+private struct FeedEventsParams: Encodable, Sendable {
+    let events: [FeedEvent]
+
+    enum CodingKeys: String, CodingKey {
+        case events = "p_events"
+    }
 }
 
 private struct UploadTicketRequest: Encodable, Sendable {
