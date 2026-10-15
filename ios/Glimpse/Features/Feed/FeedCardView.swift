@@ -96,23 +96,19 @@ struct FeedCardView: View {
                 }
                 .id(video?.id)
                 // Clear of the header/capacity banner above and the action rail on the right.
-                .padding(.top, insets.top + 104)
+                .padding(.top, insets.top + 124)
                 .padding(.leading, 16)
                 .padding(.trailing, 88)
                 .padding(.bottom, insets.bottom + 236)
             }
 
             VStack(spacing: 0) {
-                VStack(alignment: .trailing, spacing: 8) {
-                    if videos.count > 1 || clipLimit != nil {
-                        segments
-                    }
-                    if moreSeconds > 0 {
-                        moreButton
-                    }
+                // Below the feed's header and capacity banner, so nothing covers them.
+                if videos.count > 1 || clipLimit != nil {
+                    segments
+                        .padding(.top, insets.top + 112)
+                        .padding(.horizontal, 14)
                 }
-                .padding(.top, insets.top + 60)
-                .padding(.horizontal, 14)
                 Spacer()
                 HStack(alignment: .bottom, spacing: 16) {
                     info
@@ -303,7 +299,7 @@ struct FeedCardView: View {
         Button {
             showFullClip = true
         } label: {
-            Label("+\(moreSeconds)s", systemImage: "forward.fill")
+            Label("+\(moreSeconds)s more", systemImage: "forward.fill")
                 .font(.caption.weight(.heavy))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 10)
@@ -331,7 +327,12 @@ struct FeedCardView: View {
                 PromptSticker(prompt: prompt)
             }
             if let video {
-                RecencyBadge(video: video)
+                HStack(spacing: 8) {
+                    RecencyBadge(video: video)
+                    if moreSeconds > 0 {
+                        moreButton
+                    }
+                }
             }
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(profile.displayName)

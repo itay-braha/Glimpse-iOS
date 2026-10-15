@@ -373,9 +373,8 @@ final class FlowTests: XCTestCase {
         reply.tap()
 
         XCTAssertTrue(app.descendants(matching: .any)["chat.replyBar"].waitForExistence(timeout: 5))
-        let field = app.textFields.matching(NSPredicate(format: "label BEGINSWITH 'Message'")).firstMatch
-        let area = field.exists ? field : app.textViews.matching(NSPredicate(format: "label BEGINSWITH 'Message'")).firstMatch
-        area.typeText("Sunset it is. 7pm?")
+        // Reply focuses the message box.
+        app.typeText("Sunset it is. 7pm?")
         snap("8-4 Replying to her message")
         app.buttons["Send"].tap()
 
@@ -395,7 +394,7 @@ final class FlowTests: XCTestCase {
         let app = launch("alerts")
         let turnOn = app.buttons["alerts.turnOn"]
         XCTAssertTrue(turnOn.waitForExistence(timeout: 20))
-        snap("9-1 What should buzz?")
+        snap("9-1 What should buzz")
         app.buttons["alerts.messages"].tap()
         snap("9-2 Just messages")
         turnOn.tap()

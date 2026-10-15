@@ -30,6 +30,8 @@ def main(bundle: str, out_dir: str) -> None:
                 continue
             # "1-2 Phone number_0_<uuid>.png" -> "1-2 Phone number.png"
             clean = re.sub(r"_\d+_[0-9A-F-]{36}", "", name, flags=re.IGNORECASE)
+            # Artifact uploads reject these characters in file names.
+            clean = re.sub(r'[?:<>|*"]', "", clean)
             shutil.copy(os.path.join(raw, exported), os.path.join(out_dir, clean))
             count += 1
     print(f"exported {count} screenshots to {out_dir}")
