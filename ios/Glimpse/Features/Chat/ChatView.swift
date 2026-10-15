@@ -121,10 +121,15 @@ struct ChatView: View {
                     },
                     onJoin: { showCall = true }
                 )
+                // Opaque, so messages never show through behind the banner while scrolling.
+                .padding(.bottom, 6)
+                .background(Palette.midnight)
             }
         }
         .safeAreaInset(edge: .bottom) { composer }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Palette.midnight, for: .navigationBar)
+        .toolbarBackgroundVisibility(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 HStack(spacing: 8) {
@@ -271,6 +276,8 @@ struct ChatView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
+                // One compact line: the accent bar sizes to the text, not to the free space.
+                .fixedSize(horizontal: false, vertical: true)
                 .background(Palette.surface, in: .rect(cornerRadius: 14))
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("chat.replyBar")
