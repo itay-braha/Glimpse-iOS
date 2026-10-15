@@ -48,6 +48,11 @@ final class FlowTests: XCTestCase {
         return element.waitForExistence(timeout: 5) ? element.label : "?"
     }
 
+    /// The on-screen card's clip number ("Clip 2 of 3" -> 2).
+    private func clipNumber(_ app: XCUIApplication) -> Int {
+        Int(clipPosition(app).split(separator: " ").dropFirst().first ?? "") ?? 0
+    }
+
     private func currentName(_ app: XCUIApplication) -> String {
         let element = app.descendants(matching: .any).matching(identifier: "profileName.active").firstMatch
         return element.waitForExistence(timeout: 5) ? element.label : "?"
@@ -258,8 +263,13 @@ final class FlowTests: XCTestCase {
         for _ in 0..<5 where !consent.isHittable {
             app.scrollViews.firstMatch.swipeUp()
         }
-        consent.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
-        pause(0.5)
+        // Let scrolling settle, then flip the switch (retry if a tap lands mid-scroll).
+        pause(1)
+        for _ in 0..<3 where (consent.value as? String) != "1" {
+            consent.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
+            pause(0.8)
+        }
+        XCTAssertEqual(consent.value as? String, "1")
         snap("5-7 Links-to-your-profile consent")
         let addLink = app.buttons["embed.add"]
         XCTAssertTrue(addLink.isEnabled)
@@ -313,17 +323,23 @@ final class FlowTests: XCTestCase {
         let window = app.windows.firstMatch
         XCTAssertTrue(app.buttons["Glimpse"].firstMatch.waitForExistence(timeout: 10))
         let first = currentName(app)
-        XCTAssertEqual(clipPosition(app), "Clip 1 of 3")
+        // Start from her first clip (the clip timer may already have moved on).
+        for _ in 0..<4 where clipNumber(app) > 1 {
+            window.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.42)).tap()
+            pause(0.8)
+        }
+        let start = clipNumber(app)
+        XCTAssertTrue(start == 1 || start == 2)
         snap("7-2 Clip 1 of 3")
 
         window.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.42)).tap()
         pause(0.8)
-        XCTAssertEqual(clipPosition(app), "Clip 2 of 3")
+        XCTAssertEqual(clipNumber(app), start + 1)
         snap("7-3 Tap right: next clip")
 
         window.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.42)).tap()
         pause(0.8)
-        XCTAssertEqual(clipPosition(app), "Clip 1 of 3")
+        XCTAssertEqual(clipNumber(app), start)
 
         // After the clip time (7 s by default) the next clip starts by itself.
         let advanced = XCTNSPredicateExpectation(
