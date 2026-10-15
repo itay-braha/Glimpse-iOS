@@ -7,6 +7,11 @@ struct ChatMessage: Codable, Identifiable, Hashable, Sendable {
     var body: String
     var createdAt: Date
     var readAt: Date?
+    /// The message this one quotes.
+    var replyTo: UUID?
+    var unsentAt: Date?
+
+    var isUnsent: Bool { unsentAt != nil }
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -15,5 +20,7 @@ struct ChatMessage: Codable, Identifiable, Hashable, Sendable {
         case body
         case createdAt = "created_at"
         case readAt = "read_at"
+        case replyTo = "reply_to"
+        case unsentAt = "unsent_at"
     }
 }

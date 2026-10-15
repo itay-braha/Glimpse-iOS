@@ -18,6 +18,11 @@ final class PushNotifications: NSObject, UNUserNotificationCenterDelegate {
         #endif
     }
 
+    /// Not asked yet (so Glimpse's own "what should buzz?" sheet comes first).
+    func needsToAsk() async -> Bool {
+        await UNUserNotificationCenter.current().notificationSettings().authorizationStatus == .notDetermined
+    }
+
     /// Asks once (after onboarding, when the value is obvious) and registers.
     func requestAuthorizationAndRegister() async {
         let center = UNUserNotificationCenter.current()

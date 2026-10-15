@@ -17,6 +17,8 @@ struct LaunchOptions: Sendable {
         case addVideo
         /// Onboarding's last step (the video hub) for a signed-in member with no videos.
         case firstVideo
+        /// Feed with the "what should buzz?" sheet up.
+        case alerts
     }
 
     var forceDemo = false

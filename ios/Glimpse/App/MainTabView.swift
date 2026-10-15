@@ -18,6 +18,11 @@ struct MainTabView: View {
             }
         }
         .tint(Palette.mint)
+        .sheet(isPresented: $app.askForAlerts) {
+            AlertChoiceSheet { scope in
+                Task { await app.choseAlerts(scope) }
+            }
+        }
         .sheet(item: $app.paywall) { reason in
             PaywallView(reason: reason)
         }

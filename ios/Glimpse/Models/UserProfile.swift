@@ -17,6 +17,8 @@ struct UserProfile: Codable, Identifiable, Hashable, Sendable {
     var verificationStatus: String?
     /// Show people slightly outside the filters once everyone inside has been seen.
     var flexibleDiscovery: Bool?
+    /// What buzzes the phone (all / messages / none).
+    var pushScope: PushScope?
 
     var age: Int? {
         guard let date = BirthdateFormat.date(from: birthdate) else { return nil }
@@ -38,5 +40,6 @@ struct UserProfile: Codable, Identifiable, Hashable, Sendable {
         case isVerified = "is_verified"
         case verificationStatus = "verification_status"
         case flexibleDiscovery = "flexible_discovery"
+        case pushScope = "push_scope"
     }
 }

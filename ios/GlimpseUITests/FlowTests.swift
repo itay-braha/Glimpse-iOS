@@ -38,17 +38,23 @@ final class FlowTests: XCTestCase {
         return XCTWaiter.wait(for: [gone], timeout: timeout) == .completed
     }
 
-    /// The on-screen card's element (the feed keeps neighbours loaded too).
-    private func visible(_ query: XCUIElementQuery) -> XCUIElement? {
-        query.allElementsBoundByIndex.first { $0.exists && $0.isHittable }
+    /// The on-screen card tags its own elements ".active" (neighbours stay loaded).
+    private func clipPositionElement(_ app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: "clipPosition.active").firstMatch
     }
 
     private func clipPosition(_ app: XCUIApplication) -> String {
-        visible(app.otherElements.matching(identifier: "clipPosition"))?.label ?? "?"
+        let element = clipPositionElement(app)
+        return element.waitForExistence(timeout: 5) ? element.label : "?"
     }
 
     private func currentName(_ app: XCUIApplication) -> String {
-        visible(app.staticTexts.matching(identifier: "profileName"))?.label ?? "?"
+        let element = app.descendants(matching: .any).matching(identifier: "profileName.active").firstMatch
+        return element.waitForExistence(timeout: 5) ? element.label : "?"
+    }
+
+    private func visible(_ query: XCUIElementQuery) -> XCUIElement? {
+        query.allElementsBoundByIndex.first { $0.exists && $0.isHittable }
     }
 
     private func pause(_ seconds: Double) {
@@ -239,9 +245,11 @@ final class FlowTests: XCTestCase {
         snap("5-6 Public Reel recognized")
 
         field.typeText("\n") // the return key dismisses the keyboard
-        app.scrollViews.firstMatch.swipeUp()
         let consent = app.switches["embed.consent"]
         XCTAssertTrue(consent.waitForExistence(timeout: 10))
+        for _ in 0..<5 where !consent.isHittable {
+            app.scrollViews.firstMatch.swipeUp()
+        }
         consent.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
         pause(0.5)
         snap("5-7 Links-to-your-profile consent")
@@ -284,7 +292,9 @@ final class FlowTests: XCTestCase {
     func testFeedNavigation() {
         let app = XCUIApplication()
         continueAfterFailure = false
-        app.launchArguments = ["-demo", "-screen", "feed", "-showTips"]
+        // 15-second clip time (UserDefaults via launch arguments) so the checks
+        // below never race the auto-advance on a slow simulator.
+        app.launchArguments = ["-demo", "-screen", "feed", "-showTips", "-glimpse.clipSeconds", "15"]
         app.launch()
 
         let gotIt = app.buttons["tips.done"]
@@ -310,10 +320,10 @@ final class FlowTests: XCTestCase {
         // After the clip time (7 s by default) the next clip starts by itself.
         let advanced = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "label == %@", "Clip 2 of 3"),
-            object: visible(app.otherElements.matching(identifier: "clipPosition"))
+            object: clipPositionElement(app)
         )
-        XCTAssertEqual(XCTWaiter.wait(for: [advanced], timeout: 10), .completed)
-        snap("7-4 After 7 s: next clip on its own")
+        XCTAssertEqual(XCTWaiter.wait(for: [advanced], timeout: 25), .completed)
+        snap("7-4 Clip time up: next clip on its own")
 
         let more = visible(app.buttons.matching(identifier: "watchMore"))
         XCTAssertNotNil(more)
@@ -336,5 +346,66 @@ final class FlowTests: XCTestCase {
         window.swipeRight()
         XCTAssertTrue(button(app, containing: "anyway").waitForExistence(timeout: 8))
         snap("7-8 Swipe right: like (at 20, asks first)")
+    }
+
+    // A -> F: a chat that does more than send text.
+    func testChatRepliesAndReactions() {
+        let app = launch("chat")
+        let incoming = app.descendants(matching: .any).matching(identifier: "bubble.incoming")
+        XCTAssertTrue(incoming.firstMatch.waitForExistence(timeout: 20))
+        pause(1)
+        snap("8-1 Reactions and a quoted reply")
+
+        let last = incoming.allElementsBoundByIndex.last!
+        let reactionsBefore = app.descendants(matching: .any).matching(identifier: "bubble.reactions").count
+        last.doubleTap()
+        let hearted = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "count > %d", reactionsBefore),
+            object: app.descendants(matching: .any).matching(identifier: "bubble.reactions")
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [hearted], timeout: 5), .completed)
+        snap("8-2 Double-tap: a heart")
+
+        last.press(forDuration: 1.0)
+        let reply = app.buttons["Reply"]
+        XCTAssertTrue(reply.waitForExistence(timeout: 5))
+        snap("8-3 Hold: react, reply, copy")
+        reply.tap()
+
+        XCTAssertTrue(app.descendants(matching: .any)["chat.replyBar"].waitForExistence(timeout: 5))
+        let field = app.textFields.matching(NSPredicate(format: "label BEGINSWITH 'Message'")).firstMatch
+        let area = field.exists ? field : app.textViews.matching(NSPredicate(format: "label BEGINSWITH 'Message'")).firstMatch
+        area.typeText("Sunset it is. 7pm?")
+        snap("8-4 Replying to her message")
+        app.buttons["Send"].tap()
+
+        XCTAssertTrue(text(app, containing: "Sunset it is").waitForExistence(timeout: 5))
+        XCTAssertTrue(text(app, containing: "I like where this is going").waitForExistence(timeout: 15)
+            || app.descendants(matching: .any).matching(identifier: "bubble.incoming").count > incoming.count)
+        pause(1)
+        snap("8-5 Sent with the quote; she reacted and answered")
+
+        incoming.allElementsBoundByIndex.first!.swipeRight()
+        XCTAssertTrue(app.descendants(matching: .any)["chat.replyBar"].waitForExistence(timeout: 5))
+        snap("8-6 Swipe a message right to reply")
+    }
+
+    // A -> C: what buzzes is the member's choice, asked before iOS asks.
+    func testAlertChoice() {
+        let app = launch("alerts")
+        let turnOn = app.buttons["alerts.turnOn"]
+        XCTAssertTrue(turnOn.waitForExistence(timeout: 20))
+        snap("9-1 What should buzz?")
+        app.buttons["alerts.messages"].tap()
+        snap("9-2 Just messages")
+        turnOn.tap()
+
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let allow = springboard.buttons["Allow"]
+        if allow.waitForExistence(timeout: 8) {
+            snap("9-3 Then iOS asks")
+            allow.tap()
+        }
+        XCTAssertTrue(waitUntilGone(turnOn, timeout: 5))
     }
 }

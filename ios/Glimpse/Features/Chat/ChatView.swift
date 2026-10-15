@@ -30,12 +30,41 @@ struct ChatView: View {
                         .padding(.bottom, 12)
 
                     ForEach(Array(model.messages.enumerated()), id: \.element.id) { index, message in
+                        if let stamp = timeStamp(before: index) {
+                            Text(stamp)
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(Palette.textTertiary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                        }
                         MessageBubble(
                             message: message,
                             isMine: message.senderID == myID,
-                            showsTail: isLastInRun(index)
+                            showsTail: isLastInRun(index),
+                            quoted: model.message(withID: message.replyTo),
+                            quotedAuthor: author(of: model.message(withID: message.replyTo)),
+                            reactions: model.reactions(on: message),
+                            myID: myID,
+                            canUnsend: model.canUnsend(message, myID: myID),
+                            onReact: { emoji in
+                                Task { await model.react(to: message, with: emoji, myID: myID, using: app.backend) }
+                            },
+                            onReply: { startReply(to: message) },
+                            onUnsend: { Task { await model.unsend(message, using: app.backend) } },
+                            onTapQuote: {
+                                if let quoted = message.replyTo {
+                                    withAnimation(.snappy) { proxy.scrollTo(quoted, anchor: .center) }
+                                }
+                            }
                         )
                         .id(message.id)
+                        if message.id == lastSeenID {
+                            Text("Seen")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(Palette.textTertiary)
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                                .accessibilityIdentifier("chat.seen")
+                        }
                     }
 
                     if model.isOtherTyping {
@@ -49,6 +78,7 @@ struct ChatView: View {
                 .padding(.vertical, 12)
                 .animation(.snappy(duration: 0.25), value: model.messages.count)
                 .animation(.snappy(duration: 0.25), value: model.isOtherTyping)
+                .animation(.snappy(duration: 0.25), value: model.reactions)
             }
             .defaultScrollAnchor(.bottom)
             .scrollDismissesKeyboard(.interactively)
@@ -222,6 +252,30 @@ struct ChatView: View {
             if let error = model.errorMessage {
                 ErrorText(error).frame(maxWidth: .infinity, alignment: .leading)
             }
+            if let replying = model.replyingTo {
+                HStack(spacing: 10) {
+                    Capsule().fill(Palette.violet).frame(width: 3)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Replying to \(author(of: replying))")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(Palette.violet)
+                        Text(replying.body)
+                            .font(.caption)
+                            .foregroundStyle(Palette.textSecondary)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                    Button("Cancel reply", systemImage: "xmark.circle.fill") { model.replyingTo = nil }
+                        .labelStyle(.iconOnly)
+                        .foregroundStyle(Palette.textTertiary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Palette.surface, in: .rect(cornerRadius: 14))
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("chat.replyBar")
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
             HStack(alignment: .bottom, spacing: 10) {
                 TextField("Message \(model.match.displayName)", text: $model.draft, axis: .vertical)
                     .lineLimit(1...5)
@@ -250,6 +304,39 @@ struct ChatView: View {
         .padding(.top, 8)
         .padding(.bottom, 8)
         .background(Palette.midnight.opacity(0.96))
+    }
+
+    /// My most recent message the other person has read ("Seen" goes under it).
+    private var lastSeenID: UUID? {
+        guard let last = model.messages.last(where: { $0.senderID == myID }), last.readAt != nil else { return nil }
+        return last.id
+    }
+
+    private func author(of message: ChatMessage?) -> String {
+        guard let message else { return "" }
+        return message.senderID == myID ? "You" : model.match.displayName
+    }
+
+    private func startReply(to message: ChatMessage) {
+        guard !message.isUnsent, !model.hasEnded else { return }
+        withAnimation(.snappy) { model.replyingTo = message }
+        composerFocused = true
+    }
+
+    /// A time header at the start, and whenever an hour or more passed between messages.
+    private func timeStamp(before index: Int) -> String? {
+        let message = model.messages[index]
+        if index > 0, message.createdAt.timeIntervalSince(model.messages[index - 1].createdAt) < 3600 {
+            return nil
+        }
+        let date = message.createdAt
+        if Calendar.current.isDateInToday(date) {
+            return "Today \(date.formatted(date: .omitted, time: .shortened))"
+        }
+        if Calendar.current.isDateInYesterday(date) {
+            return "Yesterday \(date.formatted(date: .omitted, time: .shortened))"
+        }
+        return date.formatted(.dateTime.weekday(.abbreviated).month().day().hour().minute())
     }
 
     private func isLastInRun(_ index: Int) -> Bool {

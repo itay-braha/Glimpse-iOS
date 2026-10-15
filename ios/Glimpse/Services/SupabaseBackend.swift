@@ -351,11 +351,34 @@ final class SupabaseBackend: GlimpseBackend {
         return latest.reversed()
     }
 
-    func send(_ body: String, matchID: UUID) async throws -> ChatMessage {
-        let row = NewMessageRow(matchID: matchID, senderID: try currentUserID(), body: body)
+    func send(_ body: String, matchID: UUID, replyTo: UUID?) async throws -> ChatMessage {
+        let row = NewMessageRow(matchID: matchID, senderID: try currentUserID(), body: body, replyTo: replyTo)
         return try await mapLimits {
             try await client.from("messages").insert(row).select().single().execute().value
         }
+    }
+
+    func fetchReactions(matchID: UUID) async throws -> [MessageReaction] {
+        try await client.from("message_reactions")
+            .select()
+            .eq("match_id", value: matchID.uuidString)
+            .execute()
+            .value
+    }
+
+    func react(to messageID: UUID, emoji: String?) async throws {
+        try await client.rpc("react_to_message", params: ReactParams(message: messageID, emoji: emoji)).execute()
+    }
+
+    func unsend(_ messageID: UUID) async throws {
+        try await client.rpc("unsend_message", params: ["p_message": messageID.uuidString]).execute()
+    }
+
+    func setPushScope(_ scope: PushScope) async throws {
+        try await client.from("profiles")
+            .update(["push_scope": scope.rawValue])
+            .eq("id", value: currentUserKey())
+            .execute()
     }
 
     func markRead(matchID: UUID) async throws {
@@ -373,7 +396,61 @@ final class SupabaseBackend: GlimpseBackend {
             table: "messages",
             filter: .eq("match_id", value: matchID)
         )
+        let edits = channel.postgresChange(
+            UpdateAction.self,
+            schema: "public",
+            table: "messages",
+            filter: .eq("match_id", value: matchID)
+        )
+        let reactionInserts = channel.postgresChange(
+            InsertAction.self,
+            schema: "public",
+            table: "message_reactions",
+            filter: .eq("match_id", value: matchID)
+        )
+        let reactionUpdates = channel.postgresChange(
+            UpdateAction.self,
+            schema: "public",
+            table: "message_reactions",
+            filter: .eq("match_id", value: matchID)
+        )
         let typingEvents = channel.broadcastStream(event: "typing")
+
+        let updates = AsyncStream<ChatMessage> { continuation in
+            let task = Task {
+                let decoder = JSONDecoder.glimpse()
+                for await action in edits {
+                    if let message = try? action.decodeRecord(as: ChatMessage.self, decoder: decoder) {
+                        continuation.yield(message)
+                    }
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+
+        let reactions = AsyncStream<MessageReaction> { continuation in
+            let inserted = Task {
+                let decoder = JSONDecoder.glimpse()
+                for await action in reactionInserts {
+                    if let reaction = try? action.decodeRecord(as: MessageReaction.self, decoder: decoder) {
+                        continuation.yield(reaction)
+                    }
+                }
+            }
+            let updated = Task {
+                let decoder = JSONDecoder.glimpse()
+                for await action in reactionUpdates {
+                    if let reaction = try? action.decodeRecord(as: MessageReaction.self, decoder: decoder) {
+                        continuation.yield(reaction)
+                    }
+                }
+            }
+            continuation.onTermination = { _ in
+                inserted.cancel()
+                updated.cancel()
+            }
+        }
 
         let messages = AsyncStream<ChatMessage> { continuation in
             let task = Task {
@@ -406,6 +483,8 @@ final class SupabaseBackend: GlimpseBackend {
 
         return ChatChannel(
             messages: messages,
+            updates: updates,
+            reactions: reactions,
             typing: typing,
             sendTyping: {
                 try? await channel.broadcast(event: "typing", message: TypingPayload(userID: me ?? ""))
@@ -679,11 +758,13 @@ private struct NewMessageRow: Encodable, Sendable {
     let matchID: UUID
     let senderID: UUID
     let body: String
+    let replyTo: UUID?
 
     enum CodingKeys: String, CodingKey {
         case matchID = "match_id"
         case senderID = "sender_id"
         case body
+        case replyTo = "reply_to"
     }
 }
 
@@ -792,6 +873,23 @@ private struct FeedEventsParams: Encodable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case events = "p_events"
+    }
+}
+
+/// Sends `p_emoji: null` explicitly to remove a reaction.
+private struct ReactParams: Encodable, Sendable {
+    let message: UUID
+    let emoji: String?
+
+    enum CodingKeys: String, CodingKey {
+        case message = "p_message"
+        case emoji = "p_emoji"
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(message, forKey: .message)
+        try container.encode(emoji, forKey: .emoji)
     }
 }
 

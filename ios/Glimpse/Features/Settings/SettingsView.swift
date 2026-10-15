@@ -90,12 +90,25 @@ struct SettingsView: View {
                     Text("Then the next clip starts. Longer clips show a +more button so you can watch the rest.")
                 }
 
-                Section("Notifications") {
-                    Button("Notification settings", systemImage: "bell.badge") {
+                Section {
+                    Picker("Alert me about", selection: Binding(
+                        get: { app.profile?.pushScope ?? .all },
+                        set: { scope in Task { await app.setPushScope(scope) } }
+                    )) {
+                        ForEach(PushScope.allCases) { scope in
+                            Text(scope.title).tag(scope)
+                        }
+                    }
+                    .accessibilityIdentifier("settings.pushScope")
+                    Button("iPhone notification settings", systemImage: "bell.badge") {
                         if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
                             openURL(url)
                         }
                     }
+                } header: {
+                    Text("Alerts")
+                } footer: {
+                    Text((app.profile?.pushScope ?? .all).detail)
                 }
 
                 Section("About") {

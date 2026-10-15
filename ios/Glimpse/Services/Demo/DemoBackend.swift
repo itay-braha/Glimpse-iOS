@@ -19,6 +19,8 @@ actor DemoBackend: GlimpseBackend {
     private var messages: [UUID: [ChatMessage]] = [:]
     private var messageListeners: [UUID: AsyncStream<ChatMessage>.Continuation] = [:]
     private var typingListeners: [UUID: AsyncStream<Void>.Continuation] = [:]
+    private var reactions: [UUID: [UUID: String]] = [:]
+    private var reactionListeners: [UUID: AsyncStream<MessageReaction>.Continuation] = [:]
     private var replyCursor = 0
     private var isPlus = false
     private var likeTimes: [Date] = []
@@ -54,7 +56,12 @@ actor DemoBackend: GlimpseBackend {
         missed = seeded ? DemoData.missedConnections(now: now) : []
         incomingSecondChances = seeded ? [DemoData.secondChance(now: now)] : []
         for match in matches {
-            messages[match.matchID] = DemoData.conversation(for: match, now: now)
+            let conversation = DemoData.conversation(for: match, now: now)
+            messages[match.matchID] = conversation
+            // They loved your second message.
+            if conversation.count > 1 {
+                reactions[conversation[1].id] = [match.otherUserID: "❤️"]
+            }
         }
     }
 
@@ -495,11 +502,41 @@ actor DemoBackend: GlimpseBackend {
         messages[matchID] ?? []
     }
 
-    func send(_ body: String, matchID: UUID) -> ChatMessage {
-        let message = ChatMessage(id: UUID(), matchID: matchID, senderID: me, body: body, createdAt: .now, readAt: nil)
+    func send(_ body: String, matchID: UUID, replyTo: UUID?) -> ChatMessage {
+        var message = ChatMessage(id: UUID(), matchID: matchID, senderID: me, body: body, createdAt: .now, readAt: nil)
+        message.replyTo = replyTo
         record(message)
-        Task { await self.simulateReply(in: matchID) }
+        Task { await self.simulateReply(in: matchID, to: message) }
         return message
+    }
+
+    func fetchReactions(matchID: UUID) -> [MessageReaction] {
+        reactions.flatMap { messageID, byUser in
+            byUser.map { MessageReaction(messageID: messageID, userID: $0.key, matchID: matchID, emoji: $0.value) }
+        }
+        .filter { reaction in messages[matchID]?.contains { $0.id == reaction.messageID } == true }
+    }
+
+    func react(to messageID: UUID, emoji: String?) {
+        reactions[messageID, default: [:]][me] = emoji
+    }
+
+    func unsend(_ messageID: UUID) throws {
+        for (matchID, list) in messages {
+            guard let index = list.firstIndex(where: { $0.id == messageID }) else { continue }
+            let message = list[index]
+            guard message.senderID == me, !message.isUnsent,
+                  Date.now.timeIntervalSince(message.createdAt) < 15 * 60
+            else { throw GlimpseError.message("You can unsend your own messages for 15 minutes.") }
+            messages[matchID]?[index].unsentAt = .now
+            messages[matchID]?[index].body = "Message unsent"
+            reactions[messageID] = nil
+            return
+        }
+    }
+
+    func setPushScope(_ scope: PushScope) {
+        profile?.pushScope = scope
     }
 
     func markRead(matchID: UUID) {
@@ -509,11 +546,16 @@ actor DemoBackend: GlimpseBackend {
 
     func openChannel(matchID: UUID) -> ChatChannel {
         let (messageStream, messageContinuation) = AsyncStream.makeStream(of: ChatMessage.self)
+        let (updateStream, _) = AsyncStream.makeStream(of: ChatMessage.self)
+        let (reactionStream, reactionContinuation) = AsyncStream.makeStream(of: MessageReaction.self)
         let (typingStream, typingContinuation) = AsyncStream.makeStream(of: Void.self)
         messageListeners[matchID] = messageContinuation
+        reactionListeners[matchID] = reactionContinuation
         typingListeners[matchID] = typingContinuation
         return ChatChannel(
             messages: messageStream,
+            updates: updateStream,
+            reactions: reactionStream,
             typing: typingStream,
             sendTyping: {},
             close: { [weak self] in await self?.closeChannel(matchID) }
@@ -690,20 +732,26 @@ actor DemoBackend: GlimpseBackend {
         }
     }
 
-    private func simulateReply(in matchID: UUID) async {
+    /// The demo match reacts ❤️ to what you sent, then answers (quoting you every other time).
+    private func simulateReply(in matchID: UUID, to sent: ChatMessage) async {
         try? await Task.sleep(for: .seconds(1.2))
+        guard let match = matches.first(where: { $0.matchID == matchID }) else { return }
+        let heart = MessageReaction(messageID: sent.id, userID: match.otherUserID, matchID: matchID, emoji: "❤️")
+        reactions[sent.id, default: [:]][match.otherUserID] = "❤️"
+        reactionListeners[matchID]?.yield(heart)
         typingListeners[matchID]?.yield()
         try? await Task.sleep(for: .seconds(1.8))
-        guard let match = matches.first(where: { $0.matchID == matchID }) else { return }
         let body = DemoData.replies[replyCursor % DemoData.replies.count]
+        var reply = ChatMessage(id: UUID(), matchID: matchID, senderID: match.otherUserID, body: body, createdAt: .now, readAt: nil)
+        if replyCursor.isMultiple(of: 2) { reply.replyTo = sent.id }
         replyCursor += 1
-        let reply = ChatMessage(id: UUID(), matchID: matchID, senderID: match.otherUserID, body: body, createdAt: .now, readAt: nil)
         record(reply)
         messageListeners[matchID]?.yield(reply)
     }
 
     private func closeChannel(_ matchID: UUID) {
         messageListeners.removeValue(forKey: matchID)?.finish()
+        reactionListeners.removeValue(forKey: matchID)?.finish()
         typingListeners.removeValue(forKey: matchID)?.finish()
     }
 }

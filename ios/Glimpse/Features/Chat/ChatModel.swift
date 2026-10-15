@@ -4,14 +4,21 @@ import Observation
 @MainActor
 @Observable
 final class ChatModel {
+    /// Your own messages can be unsent for this long.
+    static let unsendWindow: TimeInterval = 15 * 60
+
     let match: MatchSummary
     private(set) var messages: [ChatMessage] = []
+    /// messageID → (userID → emoji). One reaction per person per message.
+    private(set) var reactions: [UUID: [UUID: String]] = [:]
     private(set) var isOtherTyping = false
     private(set) var isLoading = true
     private(set) var hasEnded = false
     private(set) var vibe: VibeCheckState?
     private(set) var isFrozen: Bool
     var draft = ""
+    /// The message being answered (swipe a bubble, or "Reply" in its menu).
+    var replyingTo: ChatMessage?
     var errorMessage: String?
 
     private var channel: ChatChannel?
@@ -27,11 +34,14 @@ final class ChatModel {
         !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !hasEnded
     }
 
-    /// Loads history, then listens for live messages and typing until cancelled.
+    /// Loads history, then listens for live messages, edits, reactions and typing until cancelled.
     func run(using backend: any GlimpseBackend, myID: UUID?) async {
         hasEnded = !(await isStillActive(using: backend))
         do {
             messages = try await backend.fetchMessages(matchID: match.matchID)
+            for reaction in (try? await backend.fetchReactions(matchID: match.matchID)) ?? [] {
+                apply(reaction)
+            }
             try? await backend.markRead(matchID: match.matchID)
         } catch {
             errorMessage = GlimpseError.describe(error)
@@ -45,6 +55,16 @@ final class ChatModel {
         let messageTask = Task {
             for await message in channel.messages {
                 receive(message, myID: myID, backend: backend)
+            }
+        }
+        let updateTask = Task {
+            for await message in channel.updates {
+                replace(message)
+            }
+        }
+        let reactionTask = Task {
+            for await reaction in channel.reactions {
+                apply(reaction)
             }
         }
         let typingTask = Task {
@@ -61,10 +81,14 @@ final class ChatModel {
         }
         await withTaskCancellationHandler {
             await messageTask.value
+            await updateTask.value
+            await reactionTask.value
             await typingTask.value
             await vibeTask.value
         } onCancel: {
             messageTask.cancel()
+            updateTask.cancel()
+            reactionTask.cancel()
             typingTask.cancel()
             vibeTask.cancel()
         }
@@ -76,16 +100,63 @@ final class ChatModel {
     func send(using backend: any GlimpseBackend) async {
         let body = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !body.isEmpty else { return }
+        let quoting = replyingTo
         draft = ""
+        replyingTo = nil
         do {
-            let message = try await backend.send(body, matchID: match.matchID)
+            let message = try await backend.send(body, matchID: match.matchID, replyTo: quoting?.id)
             insert(message)
         } catch {
             draft = body
+            replyingTo = quoting
             if (error as? GlimpseError) == nil, messages.isEmpty == false {
                 hasEnded = !(await isStillActive(using: backend))
             }
             errorMessage = hasEnded ? "This connection has ended." : GlimpseError.describe(error)
+        }
+    }
+
+    // MARK: Replies, reactions, unsend
+
+    func message(withID id: UUID?) -> ChatMessage? {
+        guard let id else { return nil }
+        return messages.first { $0.id == id }
+    }
+
+    /// Emojis on a message, mine first-class: tapping my own emoji again removes it.
+    func reactions(on message: ChatMessage) -> [UUID: String] {
+        reactions[message.id] ?? [:]
+    }
+
+    func react(to message: ChatMessage, with emoji: String, myID: UUID?, using backend: any GlimpseBackend) async {
+        guard let myID, !message.isUnsent, !hasEnded else { return }
+        let previous = reactions[message.id]?[myID]
+        let next: String? = previous == emoji ? nil : emoji
+        apply(MessageReaction(messageID: message.id, userID: myID, matchID: match.matchID, emoji: next))
+        do {
+            try await backend.react(to: message.id, emoji: next)
+        } catch {
+            apply(MessageReaction(messageID: message.id, userID: myID, matchID: match.matchID, emoji: previous))
+            errorMessage = GlimpseError.describe(error)
+        }
+    }
+
+    func canUnsend(_ message: ChatMessage, myID: UUID?) -> Bool {
+        message.senderID == myID && !message.isUnsent && !hasEnded
+            && Date.now.timeIntervalSince(message.createdAt) < Self.unsendWindow
+    }
+
+    func unsend(_ message: ChatMessage, using backend: any GlimpseBackend) async {
+        do {
+            try await backend.unsend(message.id)
+            var unsent = message
+            unsent.unsentAt = .now
+            unsent.body = "Message unsent"
+            replace(unsent)
+            reactions[message.id] = nil
+            if replyingTo?.id == message.id { replyingTo = nil }
+        } catch {
+            errorMessage = GlimpseError.describe(error)
         }
     }
 
@@ -121,6 +192,8 @@ final class ChatModel {
         Task { await channel.sendTyping() }
     }
 
+    // MARK: Live updates
+
     private func receive(_ message: ChatMessage, myID: UUID?, backend: any GlimpseBackend) {
         insert(message)
         if message.senderID != myID {
@@ -133,6 +206,19 @@ final class ChatModel {
         guard !messages.contains(where: { $0.id == message.id }) else { return }
         messages.append(message)
         messages.sort { $0.createdAt < $1.createdAt }
+    }
+
+    /// Edits to a message we have: read receipts, unsends.
+    private func replace(_ message: ChatMessage) {
+        guard let index = messages.firstIndex(where: { $0.id == message.id }) else { return }
+        messages[index] = message
+        if message.isUnsent { reactions[message.id] = nil }
+    }
+
+    private func apply(_ reaction: MessageReaction) {
+        var onMessage = reactions[reaction.messageID] ?? [:]
+        onMessage[reaction.userID] = reaction.emoji
+        reactions[reaction.messageID] = onMessage.isEmpty ? nil : onMessage
     }
 
     private func showTyping() {

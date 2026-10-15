@@ -47,6 +47,8 @@ final class AppModel {
     private(set) var matchesVersion = 0
     var paywall: PaywallReason?
     var showLikesYou = false
+    /// Glimpse's own alerts choice, shown once before iOS's permission prompt.
+    var askForAlerts = false
     let store = StoreManager()
     private var readyTasksStarted = false
 
@@ -148,11 +150,34 @@ final class AppModel {
         store.startListening(backend: backend)
         track("app_open")
 
+        if launch.screen == .alerts {
+            askForAlerts = true
+            return
+        }
         guard launch.screen == nil else { return } // keep scripted screenshot runs prompt-free
-        await PushNotifications.shared.requestAuthorizationAndRegister()
+        if await PushNotifications.shared.needsToAsk() {
+            askForAlerts = true
+        } else {
+            await PushNotifications.shared.requestAuthorizationAndRegister()
+        }
         if let coordinate = await LocationService.approximateCoordinate() {
             try? await backend.updateLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
         }
+    }
+
+    /// What buzzes the phone (Settings, or the first-time alerts sheet).
+    func setPushScope(_ scope: PushScope) async {
+        profile?.pushScope = scope
+        try? await backend.setPushScope(scope)
+    }
+
+    /// From the alerts sheet: remember the choice, then (if any) iOS's own prompt.
+    func choseAlerts(_ scope: PushScope?) async {
+        askForAlerts = false
+        guard let scope else { return }
+        await setPushScope(scope)
+        await PushNotifications.shared.requestAuthorizationAndRegister()
+        track("alerts_chosen", ["scope": scope.rawValue])
     }
 
     func handleNotificationTap(kind: String?, matchID: UUID?) {

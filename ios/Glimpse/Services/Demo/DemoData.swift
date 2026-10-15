@@ -232,16 +232,19 @@ enum DemoData {
             (false, match.lastMessageBody ?? "Deal 😄"),
         ]
         let start = match.lastActivity.addingTimeInterval(-Double(lines.count) * 420)
-        return lines.enumerated().map { index, line in
+        var conversation = lines.enumerated().map { index, line in
             ChatMessage(
                 id: UUID(),
                 matchID: match.matchID,
                 senderID: line.0 ? meID : match.otherUserID,
                 body: line.1,
                 createdAt: start.addingTimeInterval(Double(index) * 420),
-                readAt: nil
+                readAt: line.0 ? start.addingTimeInterval(Double(index) * 420 + 60) : nil
             )
         }
+        // "Then we're doing a sunset thing instead" answers "Respect. I can't get up before 9…"
+        conversation[3].replyTo = conversation[2].id
+        return conversation
     }
 
     static let replies = [

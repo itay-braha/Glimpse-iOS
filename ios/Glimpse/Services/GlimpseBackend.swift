@@ -67,7 +67,12 @@ protocol GlimpseBackend: AnyObject, Sendable {
 
     // MARK: Chat
     func fetchMessages(matchID: UUID) async throws -> [ChatMessage]
-    func send(_ body: String, matchID: UUID) async throws -> ChatMessage
+    func send(_ body: String, matchID: UUID, replyTo: UUID?) async throws -> ChatMessage
+    func fetchReactions(matchID: UUID) async throws -> [MessageReaction]
+    /// One reaction per person per message; nil removes yours.
+    func react(to messageID: UUID, emoji: String?) async throws
+    /// Your own message, within 15 minutes.
+    func unsend(_ messageID: UUID) async throws
     func markRead(matchID: UUID) async throws
     func openChannel(matchID: UUID) async -> ChatChannel
 
@@ -87,6 +92,7 @@ protocol GlimpseBackend: AnyObject, Sendable {
     func notifications() async throws -> [AppNotification]
     func markNotificationsRead(_ ids: [UUID]?) async throws
     func registerPushToken(_ token: String, environment: String) async throws
+    func setPushScope(_ scope: PushScope) async throws
     func unregisterPushToken(_ token: String) async
 
     // MARK: Verification
@@ -113,4 +119,10 @@ struct RecordedClip: Sendable {
     var byteCount: Int?
     /// When it was filmed, from the file's metadata (uploads); nil = now.
     var capturedAt: Date?
+}
+
+extension GlimpseBackend {
+    func send(_ body: String, matchID: UUID) async throws -> ChatMessage {
+        try await send(body, matchID: matchID, replyTo: nil)
+    }
 }

@@ -289,7 +289,7 @@ struct FeedCardView: View {
         }
         .accessibilityElement()
         .accessibilityLabel("Clip \(videoIndex + 1) of \(videos.count)")
-        .accessibilityIdentifier("clipPosition")
+        .accessibilityIdentifier(isActive ? "clipPosition.active" : "clipPosition")
     }
 
     private func fill(for index: Int, at date: Date) -> CGFloat {
@@ -336,7 +336,7 @@ struct FeedCardView: View {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(profile.displayName)
                     .font(.system(.largeTitle, design: .rounded, weight: .heavy))
-                    .accessibilityIdentifier("profileName")
+                    .accessibilityIdentifier(isActive ? "profileName.active" : "profileName")
                 Text("\(profile.age)")
                     .font(.system(.title, design: .rounded, weight: .medium))
                     .foregroundStyle(Palette.textPrimary.opacity(0.85))
