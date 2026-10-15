@@ -1,0 +1,109 @@
+name: iOS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  XCODE_APP: /Applications/Xcode_26.6.app
+
+jobs:
+  build-test-record:
+    name: Build, test, record
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Select Xcode
+        run: sudo xcode-select -s "$XCODE_APP" && xcodebuild -version
+
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          cd ios && xcodegen generate
+
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: ios/.spm
+          key: spm-${{ runner.os }}-${{ hashFiles('ios/project.yml') }}
+
+      - name: Pick and boot simulator
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)["devices"]
+          runtimes = sorted((r for r in data if "iOS" in r), reverse=True)
+          for runtime in runtimes:
+              phones = [d for d in data[runtime] if d["name"].startswith("iPhone")]
+              preferred = [d for d in phones if "Pro" in d["name"] and "Max" not in d["name"]]
+              pick = (preferred or phones)
+              if pick:
+                  print(pick[0]["udid"]); break
+          ')
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl status_bar "$UDID" override --time "9:41" --batteryState charged --batteryLevel 100 \
+            --cellularMode active --cellularBars 4 --wifiBars 3 || true
+          xcrun simctl ui "$UDID" appearance dark || true
+
+      - name: Build for testing
+        run: |
+          set +e
+          xcodebuild build-for-testing \
+            -project ios/Glimpse.xcodeproj -scheme Glimpse \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -derivedDataPath ios/.derived -clonedSourcePackagesDirPath ios/.spm \
+            -skipMacroValidation -skipPackagePluginValidation CODE_SIGNING_ALLOWED=NO \
+            > build.log 2>&1
+          STATUS=$?
+          grep -E "error:|\*\* (BUILD|TEST)" build.log | tail -150
+          exit $STATUS
+
+      - name: Run unit + UI tests while recording the screen
+        run: |
+          mkdir -p recordings
+          xcrun simctl io "${{ steps.sim.outputs.udid }}" recordVideo --codec=h264 --force recordings/ui-flows.mp4 &
+          REC=$!
+          sleep 2
+          set +e
+          xcodebuild test-without-building \
+            -project ios/Glimpse.xcodeproj -scheme Glimpse \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -derivedDataPath ios/.derived -clonedSourcePackagesDirPath ios/.spm \
+            -resultBundlePath TestResults.xcresult \
+            > test.log 2>&1
+          STATUS=$?
+          kill -INT $REC; wait $REC
+          grep -E "✔|✘|Test run|passed after|failed after|error:|XCTAssert|\*\* TEST" test.log | tail -200
+          exit $STATUS
+
+      - name: Export step screenshots
+        if: always()
+        run: python3 scripts/export-ui-attachments.py TestResults.xcresult ui-flows || true
+
+      - name: Single-screen screenshots and feed video
+        if: always()
+        run: |
+          scripts/ci-screenshots.sh "${{ steps.sim.outputs.udid }}" \
+            ios/.derived/Build/Products/Debug-iphonesimulator/Glimpse.app screenshots || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: glimpse-ios-${{ github.run_number }}
+          path: |
+            ui-flows/
+            screenshots/
+            recordings/
+            build.log
+            test.log
+          if-no-files-found: ignore

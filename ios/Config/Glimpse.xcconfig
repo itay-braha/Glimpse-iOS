@@ -1,0 +1,12 @@
+// Shared build settings. Real values live in Secrets.xcconfig (git-ignored).
+// Copy Secrets.example.xcconfig to Secrets.xcconfig and fill it in.
+// Leave the values empty to run the app in offline demo mode.
+//
+// Note: xcconfig treats "//" as a comment, so we store the host only
+// (e.g. abcd1234.supabase.co) and the app prepends https://.
+
+SUPABASE_PROJECT_HOST =
+SUPABASE_PUBLISHABLE_KEY =
+INSTAGRAM_APP_ID =
+
+#include? "Secrets.xcconfig"

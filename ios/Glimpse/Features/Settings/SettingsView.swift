@@ -1,0 +1,187 @@
+import SwiftUI
+import UIKit
+
+struct SettingsView: View {
+    @Environment(AppModel.self) private var app
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
+
+    @State private var showEditor = false
+    @State private var showVerification = false
+    @State private var legal: LegalDocument?
+    @State private var confirmDelete = false
+    @State private var deleteConfirmation = ""
+    @State private var isDeleting = false
+    @State private var errorMessage: String?
+    @State private var quota: LikeQuota?
+    @State private var showPaywall = false
+    @State private var pausedUntil: Date?
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Profile") {
+                    Button("Edit profile & discovery", systemImage: "slider.horizontal.3") { showEditor = true }
+                    verificationRow
+                }
+
+                Section("Glimpse+") {
+                    if quota?.isPlus == true {
+                        Label("You're a Glimpse+ member", systemImage: "sparkles")
+                            .foregroundStyle(Palette.mint)
+                    } else {
+                        Button {
+                            showPaywall = true
+                        } label: {
+                            Label {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Get Glimpse+")
+                                    if let quota {
+                                        Text("\(quota.remaining) of \(quota.allowance) free likes left today")
+                                            .font(.caption)
+                                            .foregroundStyle(Palette.textSecondary)
+                                    }
+                                }
+                            } icon: {
+                                Image(systemName: "sparkles")
+                            }
+                        }
+                    }
+                }
+
+                Section {
+                    if let pausedUntil, pausedUntil > .now {
+                        Label("On a break until \(pausedUntil.formatted(date: .abbreviated, time: .omitted))", systemImage: "sun.horizon.fill")
+                            .foregroundStyle(Palette.amber)
+                        Button("Resume now", systemImage: "play.fill") { Task { await setPause(0) } }
+                    } else {
+                        Menu {
+                            ForEach([3, 7, 14, 30], id: \.self) { days in
+                                Button("\(days) days") { Task { await setPause(days) } }
+                            }
+                        } label: {
+                            Label("Take a break", systemImage: "sun.horizon")
+                        }
+                    }
+                } header: {
+                    Text("Vacation mode")
+                } footer: {
+                    Text("While you're away you're hidden from discovery, your matches see you're away, nothing counts against you, and auto-release won't touch you.")
+                }
+
+                Section("Notifications") {
+                    Button("Notification settings", systemImage: "bell.badge") {
+                        if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                            openURL(url)
+                        }
+                    }
+                }
+
+                Section("About") {
+                    ForEach(LegalDocument.allCases) { document in
+                        Button(document.title, systemImage: "doc.text") { legal = document }
+                    }
+                }
+
+                Section {
+                    Button("Sign out", systemImage: "rectangle.portrait.and.arrow.right") {
+                        Task {
+                            dismiss()
+                            await app.signOut()
+                        }
+                    }
+                    Button("Delete account", systemImage: "trash", role: .destructive) {
+                        deleteConfirmation = ""
+                        confirmDelete = true
+                    }
+                    .disabled(isDeleting)
+                } footer: {
+                    Text("Deleting your account removes your profile, videos, matches and messages. This can't be undone.")
+                }
+
+                if let errorMessage {
+                    Section { ErrorText(errorMessage) }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(Palette.midnight)
+            .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            .overlay {
+                if isDeleting { ProgressView().controlSize(.large) }
+            }
+        }
+        .task {
+            quota = try? await app.backend.likeQuota()
+            pausedUntil = try? await app.backend.accountState().pausedUntil
+        }
+        .sheet(isPresented: $showPaywall, onDismiss: {
+            Task { quota = try? await app.backend.likeQuota() }
+        }) {
+            PaywallView(reason: .settings)
+        }
+        .sheet(isPresented: $showEditor) {
+            if let profile = app.profile {
+                EditProfileView(profile: profile)
+            }
+        }
+        .sheet(isPresented: $showVerification) {
+            VerificationView()
+        }
+        .sheet(item: $legal) { document in
+            LegalDocumentView(document: document)
+        }
+        .alert("Delete your account?", isPresented: $confirmDelete) {
+            TextField("Type DELETE to confirm", text: $deleteConfirmation)
+                .textInputAutocapitalization(.characters)
+            Button("Delete", role: .destructive) {
+                Task { await deleteAccount() }
+            }
+            .disabled(deleteConfirmation != "DELETE")
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your profile, videos, matches and messages will be permanently removed.")
+        }
+    }
+
+    @ViewBuilder
+    private var verificationRow: some View {
+        switch app.profile?.verificationStatus {
+        case "verified":
+            Label("Verified profile", systemImage: "checkmark.seal.fill")
+                .foregroundStyle(Palette.mint)
+        case "pending":
+            Label("Verification under review", systemImage: "hourglass")
+                .foregroundStyle(Palette.textSecondary)
+        default:
+            Button("Get verified", systemImage: "checkmark.seal") { showVerification = true }
+        }
+    }
+
+    private func setPause(_ days: Int) async {
+        do {
+            pausedUntil = try await app.backend.setPause(days: days)
+            app.track(days > 0 ? "pause_started" : "pause_ended", ["days": "\(days)"])
+            app.matchesDidChange()
+        } catch {
+            errorMessage = GlimpseError.describe(error)
+        }
+    }
+
+    private func deleteAccount() async {
+        guard deleteConfirmation == "DELETE" else { return }
+        isDeleting = true
+        defer { isDeleting = false }
+        do {
+            try await app.deleteAccount()
+            dismiss()
+        } catch {
+            errorMessage = GlimpseError.describe(error)
+        }
+    }
+}

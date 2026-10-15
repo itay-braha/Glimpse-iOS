@@ -1,0 +1,121 @@
+# XcodeGen spec. Generate the Xcode project with:  cd ios && xcodegen
+name: Glimpse
+options:
+  bundleIdPrefix: com.itaybraha
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEAD_CODE_STRIPPING: YES
+
+packages:
+  Supabase:
+    url: https://github.com/supabase/supabase-swift
+    exactVersion: 2.55.3
+  WebRTC:
+    url: https://github.com/stasel/WebRTC
+    exactVersion: 153.0.0
+
+targets:
+  Glimpse:
+    type: application
+    platform: iOS
+    sources:
+      - path: Glimpse
+    configFiles:
+      Debug: Config/Glimpse.xcconfig
+      Release: Config/Glimpse.xcconfig
+    dependencies:
+      - package: Supabase
+        product: Supabase
+      - package: WebRTC
+        product: WebRTC
+    settings:
+      configs:
+        # Push needs a paid Apple Developer team; keeping it off Debug lets a free
+        # personal team still install Debug builds on a phone.
+        Release:
+          CODE_SIGN_ENTITLEMENTS: Glimpse/Glimpse.entitlements
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.itaybraha.glimpse
+        PRODUCT_NAME: Glimpse
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: NO
+    info:
+      path: Glimpse/Info.plist
+      properties:
+        CFBundleDisplayName: Glimpse
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UIUserInterfaceStyle: Dark
+        UIStatusBarStyle: UIStatusBarStyleLightContent
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        ITSAppUsesNonExemptEncryption: false
+        NSCameraUsageDescription: Glimpse uses the camera to record your 15-second profile moments.
+        NSMicrophoneUsageDescription: Glimpse records sound with your profile moments so people hear the real you.
+        NSLocationWhenInUseUsageDescription: Glimpse uses your approximate location to show people nearby and how far away they are. Your exact location is never shared.
+        NSLocationDefaultAccuracyReduced: true
+        CFBundleURLTypes:
+          - CFBundleURLName: com.itaybraha.glimpse
+            CFBundleURLSchemes: [glimpse]
+        GlimpseSupabaseHost: $(SUPABASE_PROJECT_HOST)
+        GlimpseSupabaseKey: $(SUPABASE_PUBLISHABLE_KEY)
+        GlimpseInstagramAppID: $(INSTAGRAM_APP_ID)
+
+  GlimpseTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: GlimpseTests
+    dependencies:
+      - target: Glimpse
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.itaybraha.glimpse.tests
+        GENERATE_INFOPLIST_FILE: YES
+        BUNDLE_LOADER: $(TEST_HOST)
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Glimpse.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Glimpse
+
+  GlimpseUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: GlimpseUITests
+    dependencies:
+      - target: Glimpse
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.itaybraha.glimpse.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Glimpse
+
+schemes:
+  Glimpse:
+    build:
+      targets:
+        Glimpse: all
+        GlimpseTests: [test]
+        GlimpseUITests: [test]
+    run:
+      config: Debug
+      storeKitConfiguration: Config/Glimpse.storekit
+    test:
+      config: Debug
+      gatherCoverageData: true
+      targets:
+        - GlimpseTests
+        - GlimpseUITests

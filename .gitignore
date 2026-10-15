@@ -1,0 +1,24 @@
+# Xcode / SwiftPM
+ios/Glimpse.xcodeproj/
+ios/.derived/
+ios/.spm/
+ios/.build/
+xcuserdata/
+*.xcuserstate
+DerivedData/
+
+# Secrets
+ios/Config/Secrets.xcconfig
+.env
+.env.*
+!.env.example
+supabase/.env
+supabase/functions/.env
+
+# OS / tooling
+.DS_Store
+Thumbs.db
+node_modules/
+screenshots/
+build.log
+.claude/settings.local.json
