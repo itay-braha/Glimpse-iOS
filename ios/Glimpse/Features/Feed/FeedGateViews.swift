@@ -4,6 +4,8 @@ import SwiftUI
 struct DensityGateView: View {
     let status: DensityStatus
     let onRefresh: () -> Void
+    /// Shares the member's approximate location, then checks again.
+    var onShareLocation: () -> Void = {}
 
     private var progress: Double {
         status.required == 0 ? 1 : min(Double(status.localMembers) / Double(status.required), 1)
@@ -16,17 +18,29 @@ struct DensityGateView: View {
             Text("Glimpse is unlocking near you soon")
                 .font(.glimpseTitle2)
                 .multilineTextAlignment(.center)
-            Text("We open a city once enough people are here, so your feed is full from day one.")
+            Text("You're on the list. We open an area once \(status.required) people within \(status.radiusKm) km are in, so your feed is full from day one.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(Palette.textSecondary)
-            VStack(spacing: 8) {
-                ProgressView(value: progress)
-                    .tint(Palette.mint)
-                Text("\(status.localMembers)/\(status.required) local members ready")
-                    .font(.glimpseCaption)
-                    .foregroundStyle(Palette.textSecondary)
+            if status.needsLocation {
+                VStack(spacing: 8) {
+                    Text("Share your approximate location so we know which area you're waiting for. Your exact location is never shown.")
+                        .font(.footnote)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(Palette.textSecondary)
+                    Button("Share my location", systemImage: "location.fill", action: onShareLocation)
+                        .buttonStyle(.glimpseSecondary)
+                        .accessibilityIdentifier("waitlist.shareLocation")
+                }
+            } else {
+                VStack(spacing: 8) {
+                    ProgressView(value: progress)
+                        .tint(Palette.mint)
+                    Text("\(status.localMembers)/\(status.required) people near you are in")
+                        .font(.glimpseCaption)
+                        .foregroundStyle(Palette.textSecondary)
+                }
+                .padding(.horizontal, 24)
             }
-            .padding(.horizontal, 24)
             ShareLink(
                 item: "I'm on Glimpse: real people, real video, max 20 connections. Join me so it unlocks in our city!",
                 subject: Text("Join me on Glimpse")

@@ -175,6 +175,13 @@ struct FeedView: View {
         } else if !model.density.unlocked, !model.isLoading {
             DensityGateView(status: model.density) {
                 Task { await model.load(using: app.backend) }
+            } onShareLocation: {
+                Task {
+                    if let spot = await LocationService.approximateCoordinate() {
+                        try? await app.backend.updateLocation(latitude: spot.latitude, longitude: spot.longitude)
+                    }
+                    await model.load(using: app.backend)
+                }
             }
         } else if model.viewsExhausted, !model.isLoading {
             OutOfGlimpsesView(

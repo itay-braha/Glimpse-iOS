@@ -23,3 +23,6 @@ screenshots/
 build.log
 .claude/settings.local.json
 docs/test-evidence/*.mp4
+
+# Local secrets file (fill in .secrets/glimpse.env; never committed)
+.secrets/
