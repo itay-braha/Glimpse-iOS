@@ -367,6 +367,7 @@ struct FeedCardView: View {
                 }
             }
             .lineLimit(1)
+            .minimumScaleFactor(0.7)
             if profile.showsUp == true {
                 Label("Shows up", systemImage: "calendar.badge.checkmark")
                     .font(.caption.weight(.bold))
@@ -376,7 +377,6 @@ struct FeedCardView: View {
                     .background(Palette.mint, in: .capsule)
                     .accessibilityLabel("Shows up to dates")
             }
-            .minimumScaleFactor(0.7)
             HStack(spacing: 12) {
                 if let city = profile.city {
                     Label(city, systemImage: "location.fill")
