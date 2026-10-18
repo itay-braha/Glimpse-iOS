@@ -16,7 +16,7 @@ struct FeedTipsOverlay: View {
                 TipRow(symbol: "arrow.up.and.down", title: "Swipe up or down", detail: "Next or previous person.")
                 TipRow(symbol: "arrow.left.and.right", title: "Swipe right to like, left to pass", detail: "Or use the buttons on the side.")
                 TipRow(symbol: "timer", title: "\(Int(clipSeconds))-second clips", detail: "Each clip plays \(Int(clipSeconds)) s, then the next starts. Tap +more to watch the rest. Change it in Settings.")
-                TipRow(symbol: "eye.slash.fill", title: "Videos stay private", detail: "Screenshots and screen recordings of people's videos are blocked and not allowed. They come out blank.")
+                TipRow(symbol: "eye.slash.fill", title: "No screen recording", detail: "Screen recording isn't allowed in Glimpse: the app hides itself while one is running. Please don't share people's videos outside Glimpse.")
                 Button("Got it", action: onDone)
                     .buttonStyle(.glimpse)
                     .padding(.top, 6)
@@ -44,8 +44,8 @@ private struct TipRow: View {
                 .foregroundStyle(Palette.mint)
                 .frame(width: 32)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.glimpseHeadline).foregroundStyle(.white)
-                Text(detail).font(.subheadline).foregroundStyle(Palette.textSecondary)
+                Text(LocalizedStringKey(title)).font(.glimpseHeadline).foregroundStyle(.white)
+                Text(LocalizedStringKey(detail)).font(.subheadline).foregroundStyle(Palette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

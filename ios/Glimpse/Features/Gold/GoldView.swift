@@ -180,7 +180,7 @@ private struct Metric: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(value).font(.glimpseHeadline).foregroundStyle(tint)
-            Text(label).font(.caption2).foregroundStyle(Palette.textTertiary)
+            Text(LocalizedStringKey(label)).font(.caption2).foregroundStyle(Palette.textTertiary)
         }
     }
 }

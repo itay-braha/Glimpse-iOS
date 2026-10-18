@@ -51,14 +51,14 @@ final class StoreManager {
             switch result {
             case let .success(verification):
                 guard case let .verified(transaction) = verification else {
-                    errorMessage = "The App Store couldn't verify this purchase."
+                    errorMessage = String(localized: "The App Store couldn't verify this purchase.")
                     return false
                 }
                 let active = try await backend.verifyPurchase(signedTransaction: verification.jwsRepresentation)
                 await transaction.finish()
                 return active
             case .pending:
-                errorMessage = "Your purchase is waiting for approval."
+                errorMessage = String(localized: "Your purchase is waiting for approval.")
                 return false
             case .userCancelled:
                 return false
@@ -85,7 +85,7 @@ final class StoreManager {
                 active = true
             }
         }
-        if !active { errorMessage = "No active Glimpse+ or Glimpse Gold subscription was found." }
+        if !active { errorMessage = String(localized: "No active Glimpse+ or Glimpse Gold subscription was found.") }
         return active
     }
 }

@@ -36,7 +36,7 @@ final class ProfileModel {
 
     func delete(_ video: ProfileVideo, using backend: any GlimpseBackend) async {
         guard videos.count > 1 else {
-            errorMessage = "Keep at least one moment on your profile."
+            errorMessage = String(localized: "Keep at least one moment on your profile.")
             return
         }
         guard video.isEmbed || videos.contains(where: { !$0.isEmbed && $0.id != video.id }) else {

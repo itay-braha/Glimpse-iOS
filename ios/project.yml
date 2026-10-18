@@ -29,6 +29,11 @@ targets:
     platform: iOS
     sources:
       - path: Glimpse
+        excludes:
+          - "Legal/**"
+      # Legal documents (Hebrew and English), read at runtime.
+      - path: Glimpse/Legal
+        buildPhase: resources
     configFiles:
       Debug: Config/Glimpse.xcconfig
       Release: Config/Glimpse.xcconfig
@@ -55,6 +60,9 @@ targets:
       path: Glimpse/Info.plist
       properties:
         CFBundleDisplayName: Glimpse
+        CFBundleDevelopmentRegion: en
+        CFBundleLocalizations: [en, he]
+        CFBundleAllowMixedLocalizations: true
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen:

@@ -12,11 +12,11 @@ enum ExitReason: String, CaseIterable, Identifiable, Sendable {
 
     var label: String {
         switch self {
-        case .conversationDied: "The conversation died"
-        case .flakedOnDate: "They flaked on a date"
-        case .didntLookLikeVideo: "They didn't look like their videos"
-        case .inappropriate: "They were inappropriate"
-        case .notFeelingIt: "I just wasn't feeling it"
+        case .conversationDied: String(localized: "The conversation died")
+        case .flakedOnDate: String(localized: "They flaked on a date")
+        case .didntLookLikeVideo: String(localized: "They didn't look like their videos")
+        case .inappropriate: String(localized: "They were inappropriate")
+        case .notFeelingIt: String(localized: "I just wasn't feeling it")
         }
     }
 }

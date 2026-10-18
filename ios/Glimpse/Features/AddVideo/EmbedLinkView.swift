@@ -300,7 +300,7 @@ private struct StepHeader: View {
                 .foregroundStyle(Palette.onMint)
                 .frame(width: 26, height: 26)
                 .background(Palette.mint, in: .circle)
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(.glimpseHeadline)
         }
         .accessibilityElement(children: .combine)
@@ -318,7 +318,7 @@ private struct InstructionRow: View {
                 .font(.caption.weight(.heavy))
                 .foregroundStyle(Palette.textSecondary)
                 .frame(width: 18)
-            Text(text)
+            Text(LocalizedStringKey(text))
                 .font(.subheadline)
                 .foregroundStyle(Palette.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -338,7 +338,7 @@ private struct PlatformChoice: View {
                 PlatformGlyph(platform: platform, size: 48)
                 VStack(spacing: 2) {
                     Text(platform.name).font(.glimpseHeadline).foregroundStyle(Palette.textPrimary)
-                    Text(detail).font(.caption).foregroundStyle(Palette.textSecondary)
+                    Text(LocalizedStringKey(detail)).font(.caption).foregroundStyle(Palette.textSecondary)
                 }
             }
             .frame(maxWidth: .infinity)

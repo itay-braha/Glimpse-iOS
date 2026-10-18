@@ -7,7 +7,7 @@ struct SelectableChip: View {
 
     var body: some View {
         Button(action: action) {
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(.glimpseHeadline)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)

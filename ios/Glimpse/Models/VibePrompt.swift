@@ -23,17 +23,17 @@ enum VibePrompt: String, CaseIterable, Identifiable, Sendable {
 
     var text: String {
         switch self {
-        case .bestFriend: "My best friend"
-        case .inMyElement: "In my element"
-        case .quickHello: "Quick hello"
-        case .hotTake: "A take I'll defend forever"
-        case .redFlags: "My most harmless red flag"
-        case .sunday: "My Sunday, in 15 seconds"
-        case .greenFlag: "The green flag I look for"
-        case .proudOf: "Something I'm weirdly proud of"
-        case .perfectDate: "Pitch me our first date"
-        case .talent: "A useless talent of mine"
-        case .comfortSpot: "My comfort spot in the city"
+        case .bestFriend: String(localized: "My best friend")
+        case .inMyElement: String(localized: "In my element")
+        case .quickHello: String(localized: "Quick hello")
+        case .hotTake: String(localized: "A take I'll defend forever")
+        case .redFlags: String(localized: "My most harmless red flag")
+        case .sunday: String(localized: "My Sunday, in 15 seconds")
+        case .greenFlag: String(localized: "The green flag I look for")
+        case .proudOf: String(localized: "Something I'm weirdly proud of")
+        case .perfectDate: String(localized: "Pitch me our first date")
+        case .talent: String(localized: "A useless talent of mine")
+        case .comfortSpot: String(localized: "My comfort spot in the city")
         }
     }
 
@@ -56,9 +56,9 @@ enum VibePrompt: String, CaseIterable, Identifiable, Sendable {
     /// What to film, shown on the inspiration card and in the camera.
     var idea: String {
         switch self {
-        case .bestFriend: "Introduce your dog, your cat, or the friend who'd vouch for you."
-        case .inMyElement: "Surfing, cooking, climbing, DJ-ing. Show the thing that makes you light up."
-        case .quickHello: "Just you, saying hi. Your voice, your smile, 15 seconds."
+        case .bestFriend: String(localized: "Introduce your dog, your cat, or the friend who'd vouch for you.")
+        case .inMyElement: String(localized: "Surfing, cooking, climbing, DJ-ing. Show the thing that makes you light up.")
+        case .quickHello: String(localized: "Just you, saying hi. Your voice, your smile, 15 seconds.")
         default: text
         }
     }

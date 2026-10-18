@@ -15,7 +15,7 @@ enum RecordingPurpose: Equatable {
 
     var prompt: String {
         switch self {
-        case .profileClip: "Aim for 7 seconds (up to 15). Be yourself."
+        case .profileClip: String(localized: "Aim for 7 seconds (up to 15). Be yourself.")
         case let .verification(challenge): challenge.gesture
         }
     }
@@ -52,11 +52,11 @@ final class RecorderModel {
 
     func prepare() async {
         guard CameraController.isAvailable else {
-            state = .unavailable("This device has no camera. On a real iPhone you can record up to 15 seconds here.")
+            state = .unavailable(String(localized: "This device has no camera. On a real iPhone you can record up to 15 seconds here."))
             return
         }
         guard await CameraController.requestAccess() else {
-            state = .unavailable("Glimpse needs camera and microphone access to record. You can turn it on in Settings.")
+            state = .unavailable(String(localized: "Glimpse needs camera and microphone access to record. You can turn it on in Settings."))
             return
         }
         do {
@@ -99,6 +99,11 @@ final class RecorderModel {
         guard case let .review(url) = state else { return (false, nil) }
         state = .uploading
         do {
+            if case .profileClip = purpose, try await SensitiveContentChecker.shared.isSensitive(url) {
+                errorMessage = String(localized: "This video looks like it may contain nudity, which isn't allowed on Glimpse.")
+                state = .review(url)
+                return (false, nil)
+            }
             var clip = try await VideoCompressor.prepare(url)
             clip.promptKey = selectedPrompt?.rawValue
             switch purpose {

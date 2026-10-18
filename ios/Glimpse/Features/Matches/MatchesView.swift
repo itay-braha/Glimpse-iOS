@@ -438,7 +438,7 @@ private struct Tag: View {
     let color: Color
 
     var body: some View {
-        Text(text)
+        Text(LocalizedStringKey(text))
             .font(.caption2.weight(.bold))
             .foregroundStyle(color)
             .padding(.horizontal, 7)

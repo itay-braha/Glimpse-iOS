@@ -9,17 +9,17 @@ enum Gender: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var label: String {
         switch self {
-        case .woman: "Woman"
-        case .man: "Man"
-        case .nonbinary: "Nonbinary"
+        case .woman: String(localized: "Woman")
+        case .man: String(localized: "Man")
+        case .nonbinary: String(localized: "Nonbinary")
         }
     }
 
     var pluralLabel: String {
         switch self {
-        case .woman: "Women"
-        case .man: "Men"
-        case .nonbinary: "Nonbinary people"
+        case .woman: String(localized: "Women")
+        case .man: String(localized: "Men")
+        case .nonbinary: String(localized: "Nonbinary people")
         }
     }
 }

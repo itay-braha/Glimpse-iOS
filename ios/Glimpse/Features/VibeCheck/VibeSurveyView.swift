@@ -48,8 +48,8 @@ private struct Option: View {
                     .frame(width: 44, height: 44)
                     .background(tint.opacity(0.14), in: .rect(cornerRadius: 12))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.glimpseHeadline).foregroundStyle(Palette.textPrimary)
-                    Text(detail).font(.subheadline).foregroundStyle(Palette.textSecondary)
+                    Text(LocalizedStringKey(title)).font(.glimpseHeadline).foregroundStyle(Palette.textPrimary)
+                    Text(LocalizedStringKey(detail)).font(.subheadline).foregroundStyle(Palette.textSecondary)
                 }
                 Spacer()
             }

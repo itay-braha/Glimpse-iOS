@@ -3,7 +3,8 @@ import SwiftUI
 struct WelcomeView: View {
     let onStart: () -> Void
 
-    @State private var legal: LegalDocument?
+    @State private var acceptsTerms = false
+    @State private var acceptsSensitiveData = false
 
     var body: some View {
         ZStack {
@@ -33,34 +34,22 @@ struct WelcomeView: View {
                     ValueProp(symbol: "checkmark.shield.fill", tint: Color(hex: 0x7AF0FF),
                               title: "Verified humans", detail: "Real numbers, real devices, no catfish.")
                     ValueProp(symbol: "eye.slash.fill", tint: Palette.violet,
-                              title: "Private by design", detail: "Screenshots and screen recordings of videos and calls are blocked, and not allowed.")
+                              title: "Private by design", detail: "No screen recording anywhere in Glimpse, and no screenshots during Vibe Checks.")
                 }
-                .padding(.vertical, 36)
+                .padding(.vertical, 28)
 
-                Button("Get started", action: onStart)
-                    .buttonStyle(.glimpse)
+                ConsentToggles(acceptsTerms: $acceptsTerms, acceptsSensitiveData: $acceptsSensitiveData)
+                    .padding(.bottom, 14)
 
-                VStack(spacing: 6) {
-                    Text("18+ only. By continuing you agree to our")
-                        .foregroundStyle(Palette.textTertiary)
-                    HStack(spacing: 6) {
-                        Button("Terms") { legal = .terms }
-                        Text("·").foregroundStyle(Palette.textTertiary)
-                        Button("Privacy Policy") { legal = .privacy }
-                        Text("·").foregroundStyle(Palette.textTertiary)
-                        Button("Community Rules") { legal = .communityRules }
-                    }
-                    .foregroundStyle(Palette.textSecondary)
+                Button("Get started") {
+                    ConsentStore.markPending()
+                    onStart()
                 }
-                .font(.footnote)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 14)
+                .buttonStyle(.glimpse)
+                .disabled(!acceptsTerms || !acceptsSensitiveData)
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 12)
-        }
-        .sheet(item: $legal) { document in
-            LegalDocumentView(document: document)
         }
     }
 }
@@ -79,8 +68,8 @@ private struct ValueProp: View {
                 .frame(width: 28)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.glimpseHeadline)
-                Text(detail)
+                Text(LocalizedStringKey(title)).font(.glimpseHeadline)
+                Text(LocalizedStringKey(detail))
                     .font(.subheadline)
                     .foregroundStyle(Palette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)

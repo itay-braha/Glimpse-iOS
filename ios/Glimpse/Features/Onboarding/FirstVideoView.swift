@@ -70,8 +70,8 @@ struct VideoSourceCard<Icon: View>: View {
                 icon
                     .frame(width: 48, height: 48)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(title).font(.glimpseHeadline).foregroundStyle(Palette.textPrimary)
-                    Text(detail).font(.subheadline).foregroundStyle(Palette.textSecondary)
+                    Text(LocalizedStringKey(title)).font(.glimpseHeadline).foregroundStyle(Palette.textPrimary)
+                    Text(LocalizedStringKey(detail)).font(.subheadline).foregroundStyle(Palette.textSecondary)
                 }
                 Spacer()
                 Image(systemName: "chevron.right")

@@ -129,9 +129,11 @@ struct VideoNoteBubble: View {
         ZStack {
             Palette.surfaceRaised
             if let url {
-                LoopingVideoPlayer(url: url, isActive: true, isMuted: !withSound)
-                    .id("\(message.id)-\(playToken)")
-                    .allowsHitTesting(false)
+                SensitiveVideoGate(url: url) {
+                    LoopingVideoPlayer(url: url, isActive: true, isMuted: !withSound)
+                        .allowsHitTesting(false)
+                }
+                .id("\(message.id)-\(playToken)")
             } else {
                 ProgressView().tint(.white)
             }

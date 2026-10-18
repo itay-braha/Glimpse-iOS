@@ -13,17 +13,17 @@ enum PushScope: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .all: "Everything"
-        case .messages: "Just messages"
-        case .none: "Nothing"
+        case .all: String(localized: "Everything")
+        case .messages: String(localized: "Just messages")
+        case .none: String(localized: "Nothing")
         }
     }
 
     var detail: String {
         switch self {
-        case .all: "New matches, who liked you, messages, Vibe Check invites and reminders."
-        case .messages: "Only when a match texts you or reacts to your message."
-        case .none: "No alerts. You'll see everything when you open Glimpse."
+        case .all: String(localized: "New matches, who liked you, messages, Vibe Check invites and reminders.")
+        case .messages: String(localized: "Only when a match texts you or reacts to your message.")
+        case .none: String(localized: "No alerts. You'll see everything when you open Glimpse.")
         }
     }
 }

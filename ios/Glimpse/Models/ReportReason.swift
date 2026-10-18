@@ -22,14 +22,14 @@ enum ReportReason: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var label: String {
         switch self {
-        case .harassment: "Harassment or threats"
-        case .ghosting: "Ghosted after matching"
-        case .fakeProfile: "Fake or impersonating"
-        case .inappropriateContent: "Inappropriate content"
-        case .underage: "May be under 18"
-        case .aiGenerated: "Looks AI-generated or deepfake"
-        case .spam: "Spam or scam"
-        case .other: "Something else"
+        case .harassment: String(localized: "Harassment or threats")
+        case .ghosting: String(localized: "Ghosted after matching")
+        case .fakeProfile: String(localized: "Fake or impersonating")
+        case .inappropriateContent: String(localized: "Inappropriate content")
+        case .underage: String(localized: "May be under 18")
+        case .aiGenerated: String(localized: "Looks AI-generated or deepfake")
+        case .spam: String(localized: "Spam or scam")
+        case .other: String(localized: "Something else")
         }
     }
 }

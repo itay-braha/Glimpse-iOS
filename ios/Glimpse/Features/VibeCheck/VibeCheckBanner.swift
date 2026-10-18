@@ -83,7 +83,7 @@ struct VibeCheckBanner: View {
         }
     }
 
-    private func card(title: String, detail: String, primary: (String, () -> Void)) -> some View {
+    private func card(title: LocalizedStringKey, detail: LocalizedStringKey, primary: (LocalizedStringKey, () -> Void)) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title).font(.glimpseHeadline)
             Text(detail).font(.subheadline).foregroundStyle(Palette.textSecondary)
@@ -94,7 +94,7 @@ struct VibeCheckBanner: View {
         .modifier(CardStyle())
     }
 
-    private func pill(symbol: String, text: String, tint: Color) -> some View {
+    private func pill(symbol: String, text: LocalizedStringKey, tint: Color) -> some View {
         Label(text, systemImage: symbol)
             .font(.footnote.weight(.semibold))
             .foregroundStyle(tint)

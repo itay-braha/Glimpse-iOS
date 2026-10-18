@@ -50,6 +50,8 @@ final class AppModel {
     var showLikesYou = false
     /// Glimpse's own alerts choice, shown once before iOS's permission prompt.
     var askForAlerts = false
+    /// The Terms or Privacy Policy changed since this member last agreed.
+    var needsTermsAcceptance = false
     /// A rare, in-context offer to turn on one kind of alert.
     var alertNudge: AlertNudge?
     private let nudges = AlertNudges()
@@ -69,10 +71,10 @@ final class AppModel {
             backend = SupabaseBackend(config: config)
         } else {
             let seeded = launch.screen != nil && launch.screen != .welcome
-            backend = DemoBackend(seeded: seeded, withVideos: launch.screen != .firstVideo, videoCalls: launch.screen == .videoCall)
+            backend = DemoBackend(seeded: seeded, withVideos: launch.screen != .firstVideo, vibeVerified: launch.screen == .dateIdea)
         }
         switch launch.screen {
-        case .connections, .chat, .videoCall: selectedTab = .connections
+        case .connections, .chat, .dateIdea: selectedTab = .connections
         case .likes:
             selectedTab = .connections
             showLikesYou = true
@@ -156,6 +158,7 @@ final class AppModel {
         DiagnosticsReporter.backend = backend
         store.startListening(backend: backend)
         track("app_open")
+        Task { await syncLanguageAndConsent() }
         Task { await VibeRecordingUploads.uploadPending(using: backend) }
 
         if launch.screen == .alerts {
@@ -178,16 +181,37 @@ final class AppModel {
         }
     }
 
+    /// Tells the server the phone's language, records what was agreed at sign-up,
+    /// and asks again if the terms changed since.
+    private func syncLanguageAndConsent() async {
+        await backend.setLocale(ConsentStore.languageCode)
+        if let pending = ConsentStore.pendingVersion {
+            do {
+                try await backend.recordConsents(["terms", "sensitive_data"], version: pending, locale: ConsentStore.languageCode)
+                ConsentStore.markRecorded(pending)
+            } catch {
+                return // retried next launch
+            }
+        }
+        guard launch.screen == nil else { return } // scripted runs stay prompt-free
+        let onRecord = (try? await backend.myConsentVersion()) ?? ConsentStore.acceptedVersion
+        if onRecord != ConsentStore.currentVersion {
+            needsTermsAcceptance = true
+        }
+    }
+
+    func acceptUpdatedTerms() async {
+        needsTermsAcceptance = false
+        let version = ConsentStore.currentVersion
+        try? await backend.recordConsents(["terms", "sensitive_data"], version: version, locale: ConsentStore.languageCode)
+        ConsentStore.markRecorded(version)
+        track("terms_accepted", ["version": version])
+    }
+
     /// What buzzes the phone (Settings, or the first-time alerts sheet).
     func setPushScope(_ scope: PushScope) async {
         profile?.pushScope = scope
         try? await backend.setPushScope(scope)
-    }
-
-    func setVideoCallsEnabled(_ enabled: Bool) async {
-        profile?.videoCallsEnabled = enabled
-        try? await backend.setVideoCallsEnabled(enabled)
-        track("video_calls_setting", ["enabled": "\(enabled)"])
     }
 
     func setDataConsent(aiTraining: Bool, sharing: Bool) async {
@@ -292,7 +316,7 @@ final class AppModel {
 
     /// For `-screen chat` launches: opens the most recent conversation once.
     func openLaunchChatIfNeeded(from conversations: [MatchSummary]) {
-        guard launch.screen == .chat || launch.screen == .videoCall, !launchChatConsumed, let first = conversations.first else { return }
+        guard launch.screen == .chat || launch.screen == .dateIdea, !launchChatConsumed, let first = conversations.first else { return }
         launchChatConsumed = true
         connectionsPath = [first]
     }
@@ -315,15 +339,15 @@ final class AppModel {
     private func blockedMessage(for reason: String?) -> String {
         switch reason {
         case "device_blacklisted":
-            "This iPhone is no longer allowed to create Glimpse accounts after a serious violation of our community rules."
+            String(localized: "This iPhone is no longer allowed to create Glimpse accounts after a serious violation of our community rules.")
         case "account_terminated", "terminated":
-            "This account was closed for violating our community rules."
+            String(localized: "This account was closed for violating our community rules.")
         case "underage_review":
-            "Your account is paused while we review it. We'll be in touch soon."
+            String(localized: "Your account is paused while we review it. We'll be in touch soon.")
         case "safety_review":
-            "Your account is on hold while our safety team reviews a report about a conversation. We'll let you know the outcome."
+            String(localized: "Your account is on hold while our safety team reviews a report about a conversation. We'll let you know the outcome.")
         default:
-            "We couldn't verify this device."
+            String(localized: "We couldn't verify this device.")
         }
     }
 }

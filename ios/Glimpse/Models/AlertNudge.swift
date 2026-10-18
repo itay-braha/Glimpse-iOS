@@ -37,20 +37,20 @@ struct AlertNudge: Identifiable, Hashable, Sendable {
 
     var title: String {
         switch topic {
-        case .vibeCheck: "A heads-up before your Vibe Check?"
-        case .newMatch: "Want to know about new matches?"
-        case .replies: "Want to know when \(name) replies?"
+        case .vibeCheck: String(localized: "A heads-up before your Vibe Check?")
+        case .newMatch: String(localized: "Want to know about new matches?")
+        case .replies: String(localized: "Want to know when \(name) replies?")
         }
     }
 
     var message: String {
         switch topic {
         case .vibeCheck:
-            "You're on \"Just messages\", so we'd stay quiet. We can also tap you on the shoulder a few minutes before your call with \(name), and when they're in the lobby. Nothing else changes."
+            String(localized: "You're on \"Just messages\", so we'd stay quiet. We can also tap you on the shoulder a few minutes before your call with \(name), and when they're in the lobby. Nothing else changes.")
         case .newMatch:
-            "You're on \"Just messages\". We can also let you know the moment someone likes you back, like \(name) just did. Nothing else changes."
+            String(localized: "You're on \"Just messages\". We can also let you know the moment someone likes you back, like \(name) just did. Nothing else changes.")
         case .replies:
-            "Alerts are off, so you'd only see it next time you open Glimpse. We can let you know when a match writes back. Just messages, nothing else."
+            String(localized: "Alerts are off, so you'd only see it next time you open Glimpse. We can let you know when a match writes back. Just messages, nothing else.")
         }
     }
 }

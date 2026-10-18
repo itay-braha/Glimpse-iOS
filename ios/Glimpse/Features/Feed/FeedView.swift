@@ -13,8 +13,6 @@ struct FeedView: View {
     @State private var showLikesInfo = false
     @State private var admirerCount = 0
     @State private var rewindNotice: String?
-    /// A gentle note after a screenshot: videos are protected, nothing more happens.
-    @State private var showCaptureNote = false
 
     var body: some View {
         GeometryReader { proxy in
@@ -53,30 +51,8 @@ struct FeedView: View {
         }
         .animation(.smooth(duration: 0.35), value: model.celebration)
         .toolbar(model.celebration == nil ? .visible : .hidden, for: .tabBar)
-        .overlay(alignment: .bottom) {
-            if showCaptureNote {
-                Label("Videos on Glimpse are private, so screenshots and recordings come out blank.", systemImage: "eye.slash.fill")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(Palette.textPrimary)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(.ultraThinMaterial, in: .capsule)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 24)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .accessibilityIdentifier("feed.captureNote")
-            }
-        }
-        .animation(.smooth, value: showCaptureNote)
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.userDidTakeScreenshotNotification)) { _ in
-            showCaptureNote = true
-            Task {
-                try? await Task.sleep(for: .seconds(4))
-                showCaptureNote = false
-            }
-        }
         .alert(
-            "Rewind",
+            String(localized: "Rewind"),
             isPresented: Binding(get: { rewindNotice != nil }, set: { if !$0 { rewindNotice = nil } })
         ) {
             Button("OK", role: .cancel) {}
@@ -211,15 +187,15 @@ struct FeedView: View {
                 // Quiet until the end, like the like counter.
                 let left = (try? await app.backend.goldStatus().rewindsLeft) ?? 5
                 if left <= 1 {
-                    rewindNotice = left == 0 ? "That was your last rewind today. More tomorrow." : "1 rewind left today."
+                    rewindNotice = left == 0 ? String(localized: "That was your last rewind today. More tomorrow.") : String(localized: "1 rewind left today.")
                 }
             } else {
-                rewindNotice = "There's nobody to bring back right now."
+                rewindNotice = String(localized: "There's nobody to bring back right now.")
             }
         } catch GlimpseError.goldRequired {
             app.paywall = .gold
         } catch GlimpseError.rewindLimit {
-            rewindNotice = "You've used today's 5 rewinds. They come back tomorrow."
+            rewindNotice = String(localized: "You've used today's 5 rewinds. They come back tomorrow.")
         } catch {
             rewindNotice = GlimpseError.describe(error)
         }
@@ -303,7 +279,7 @@ struct FeedView: View {
                 Image(systemName: "sparkles")
                     .font(.system(size: 44))
                     .foregroundStyle(Palette.brandGradient)
-                Text(model.errorMessage == nil ? "You're all caught up" : "Couldn't load your feed")
+                Text(model.errorMessage == nil ? String(localized: "You're all caught up") : String(localized: "Couldn't load your feed"))
                     .font(.glimpseTitle2)
                 Text(model.errorMessage ?? "New people join every day. In the meantime, keep your conversations alive.")
                     .multilineTextAlignment(.center)
@@ -366,15 +342,15 @@ private struct LikesLeftPill: View {
                 .background(.ultraThinMaterial, in: .capsule)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(remaining == 0 ? "No likes left today" : "\(remaining) likes left today")
+        .accessibilityLabel(remaining == 0 ? String(localized: "No likes left today") : String(localized: "\(remaining) likes left today"))
         .accessibilityIdentifier("feed.likesLeft")
     }
 
     private var title: String {
         switch remaining {
-        case 0: "No likes left"
-        case 1: "Last like today"
-        default: "\(remaining) likes left"
+        case 0: String(localized: "No likes left")
+        case 1: String(localized: "Last like today")
+        default: String(localized: "\(remaining) likes left")
         }
     }
 }

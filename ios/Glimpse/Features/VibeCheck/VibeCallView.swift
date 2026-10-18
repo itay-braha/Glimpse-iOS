@@ -10,14 +10,8 @@ struct VibeCallView: View {
     /// Called after the survey with the chosen outcome.
     let onFinished: (VibeOutcome?) -> Void
 
-    init(
-        match: MatchSummary, myID: UUID, backend: any GlimpseBackend,
-        kind: VibeCallModel.Kind = .vibeCheck, recordingAgreed: Bool = false,
-        onFinished: @escaping (VibeOutcome?) -> Void
-    ) {
-        _model = State(initialValue: VibeCallModel(
-            match: match, myID: myID, backend: backend, kind: kind, recordingAgreed: recordingAgreed
-        ))
+    init(match: MatchSummary, myID: UUID, backend: any GlimpseBackend, onFinished: @escaping (VibeOutcome?) -> Void) {
+        _model = State(initialValue: VibeCallModel(match: match, myID: myID, backend: backend))
         self.onFinished = onFinished
     }
 
@@ -34,13 +28,6 @@ struct VibeCallView: View {
                 lobby
             case .live:
                 live
-            case .ended where model.isVideoCall:
-                // Video calls just end; "End & report" goes straight to the report.
-                ProgressView().tint(.white)
-                    .task {
-                        onFinished(reportAfterEnd ? .report : nil)
-                        dismiss()
-                    }
             case .ended:
                 if showSurvey {
                     VibeSurveyView(name: model.match.displayName, startReport: reportAfterEnd) { outcome in
@@ -77,13 +64,10 @@ struct VibeCallView: View {
                 Spacer()
             }
 
-            Text(model.isVideoCall ? "Video call with \(model.match.displayName)" : "3-Minute Vibe Check")
+            Text("3-Minute Vibe Check")
                 .font(.glimpseTitle2)
                 .foregroundStyle(Palette.brandGradient)
-            Text(model.isVideoCall
-                 ? (model.meReady ? "Calling… it starts when \(model.match.displayName) joins, and ends on its own after 15 minutes."
-                                  : "Up to 15 minutes, and it ends on its own. Either of you can turn video calls off at any time.")
-                 : "Check your camera and light. The call starts when you're both ready, and ends on its own after 3 minutes.")
+            Text("Check your camera and light. The call starts when you're both ready, and ends on its own after 3 minutes.")
                 .font(.subheadline)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(Palette.textSecondary)
@@ -214,13 +198,23 @@ struct VibeCallView: View {
                 }
                 .padding(.horizontal, 16)
 
-                if model.isVideoCall {
-                    Color.clear.frame(height: 24)
-                } else {
-                    IcebreakerCard(text: VibeCallModel.icebreakers[model.icebreakerIndex]) {
-                        model.nextIcebreaker()
-                    }
+                if model.showTopics {
+                    IcebreakerCard(
+                        text: model.currentTopic,
+                        onNext: { model.nextTopic() },
+                        onHide: { model.setShowTopics(false) }
+                    )
                     .padding(16)
+                } else {
+                    Button("Topics", systemImage: "sparkles") { model.setShowTopics(true) }
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(.ultraThinMaterial, in: .capsule)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                        .accessibilityIdentifier("vibe.showTopics")
                 }
             }
         }
@@ -286,7 +280,7 @@ private struct ReadyChip: View {
     let ready: Bool
 
     var body: some View {
-        Label(name, systemImage: ready ? "checkmark.circle.fill" : "circle.dotted")
+        Label(LocalizedStringKey(name), systemImage: ready ? "checkmark.circle.fill" : "circle.dotted")
             .font(.glimpseCaption)
             .foregroundStyle(ready ? Palette.mint : Palette.textSecondary)
             .padding(.horizontal, 12)
@@ -296,27 +290,40 @@ private struct ReadyChip: View {
     }
 }
 
+/// A topic to talk about. Tap anywhere for a new one; × hides topics (remembered).
 private struct IcebreakerCard: View {
     let text: String
     let onNext: () -> Void
+    let onHide: () -> Void
 
     var body: some View {
-        Button(action: onNext) {
-            HStack(spacing: 12) {
-                Image(systemName: "sparkles").foregroundStyle(Palette.brandGradient)
-                Text(text)
-                    .font(.glimpseHeadline)
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.leading)
-                Spacer()
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .foregroundStyle(.white.opacity(0.6))
+        HStack(spacing: 12) {
+            Button(action: onNext) {
+                HStack(spacing: 12) {
+                    Image(systemName: "sparkles").foregroundStyle(Palette.brandGradient)
+                    Text(text)
+                        .font(.glimpseHeadline)
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.leading)
+                        .contentTransition(.opacity)
+                    Spacer(minLength: 4)
+                    Label("New topic", systemImage: "arrow.triangle.2.circlepath")
+                        .labelStyle(.iconOnly)
+                        .foregroundStyle(.white.opacity(0.75))
+                }
             }
-            .padding(16)
-            .background(.ultraThinMaterial, in: .rect(cornerRadius: 20))
+            .buttonStyle(.plain)
+            .accessibilityHint("Shows another topic")
+            .accessibilityIdentifier("vibe.nextTopic")
+            Button("Hide topics", systemImage: "xmark", action: onHide)
+                .labelStyle(.iconOnly)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.white.opacity(0.6))
+                .frame(width: 28, height: 28)
+                .accessibilityIdentifier("vibe.hideTopics")
         }
-        .buttonStyle(.plain)
-        .accessibilityHint("Shows another icebreaker")
+        .padding(16)
+        .background(.ultraThinMaterial, in: .rect(cornerRadius: 20))
         .animation(.snappy, value: text)
     }
 }

@@ -10,8 +10,8 @@ enum AlertExtra: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .vibeCheck: "Vibe Check reminders"
-        case .newMatch: "New matches"
+        case .vibeCheck: String(localized: "Vibe Check reminders")
+        case .newMatch: String(localized: "New matches")
         }
     }
 }

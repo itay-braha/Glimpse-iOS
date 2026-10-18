@@ -113,7 +113,7 @@ private struct Step: View {
                 .foregroundStyle(Palette.onMint)
                 .frame(width: 24, height: 24)
                 .background(Palette.mint, in: .circle)
-            Text(text)
+            Text(LocalizedStringKey(text))
                 .foregroundStyle(Palette.textSecondary)
         }
     }

@@ -103,28 +103,23 @@ protocol GlimpseBackend: AnyObject, Sendable {
     func vibeSubmitResult(matchID: UUID, outcome: VibeOutcome) async throws -> Bool
     func vibeIceServers(matchID: UUID) async throws -> [IceServerConfig]
     func openVibeSignaling(matchID: UUID) async -> VibeSignalChannel
-    /// One 20-second piece of a call's safety recording (a Vibe Check, or a video call
-    /// when `callID` is set). `received`: this phone's backup copy of the other person's video.
+    /// One 20-second piece of a Vibe Check safety recording. `received`: this phone's
+    /// backup copy of the other person's video.
     func uploadVibeSegment(
-        matchID: UUID, callID: UUID?, fileURL: URL, startedAt: Date, part: Int, duration: Double?, received: Bool
+        matchID: UUID, fileURL: URL, startedAt: Date, part: Int, duration: Double?, received: Bool
     ) async throws
     /// Whether this phone's backup copy is needed (their own recording missing, or a report).
-    func vibeBackupDecision(matchID: UUID, callID: UUID?) async throws -> VibeBackupDecision
+    func vibeBackupDecision(matchID: UUID) async throws -> VibeBackupDecision
 
-    // MARK: Video calls (after a good Vibe Check)
-    func videoCallState(matchID: UUID) async throws -> VideoCallState
-    /// The Settings switch: off by default.
-    func setVideoCallsEnabled(_ enabled: Bool) async throws
-    /// Key holders allow (or stop) video calls with one match.
-    func setMatchVideoCalls(matchID: UUID, allowed: Bool) async throws
-    /// Anyone, any time; ends a ringing or live call.
-    func blockMatchVideoCalls(matchID: UUID, blocked: Bool) async throws
-    func agreeVideoCallRecording(matchID: UUID) async throws
-    func ringVideoCall(matchID: UUID) async throws -> UUID
-    /// Returns the call clock when accepted.
-    func answerVideoCall(callID: UUID, accept: Bool) async throws -> VibeClock?
-    func videoCallClock(callID: UUID) async throws -> VibeClock
-    func endVideoCall(callID: UUID) async
+    /// Conversation topics from both profiles (the app adds general ones).
+    func vibeTopics(matchID: UUID) async throws -> [String]
+
+    // MARK: Date ideas (after a good Vibe Check)
+    /// Nil until the match qualifies.
+    func dateIdea(matchID: UUID) async throws -> DateIdea?
+    func nextDateIdea(matchID: UUID) async throws -> DateIdea?
+    func logDateIdea(_ ideaID: UUID, feedback: DateIdea.Feedback) async
+
     /// A screenshot or screen-recording attempt during a call, for the safety team.
     func logVibeCapture(matchID: UUID, kind: String) async
 
@@ -133,6 +128,12 @@ protocol GlimpseBackend: AnyObject, Sendable {
     func markNotificationsRead(_ ids: [UUID]?) async throws
     func registerPushToken(_ token: String, environment: String) async throws
     func setPushScope(_ scope: PushScope) async throws
+    /// The phone's language ("he" / "en"): what the server writes alerts and topics in.
+    func setLocale(_ code: String) async
+    /// Records agreement to the legal documents (proof, with the version).
+    func recordConsents(_ kinds: [String], version: String, locale: String) async throws
+    /// The latest terms version this member agreed to (nil if none on record).
+    func myConsentVersion() async throws -> String?
     func setPushExtras(_ extras: [AlertExtra]) async throws
     /// Both are opt-in and off by default.
     func setDataConsent(aiTraining: Bool, sharing: Bool) async throws

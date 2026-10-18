@@ -22,10 +22,10 @@ struct OnboardingScaffold<Content: View, Footer: View>: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    Text(title)
+                    Text(LocalizedStringKey(title))
                         .font(.glimpseTitle)
                         .foregroundStyle(Palette.textPrimary)
-                    Text(subtitle)
+                    Text(LocalizedStringKey(subtitle))
                         .font(.glimpseBody)
                         .foregroundStyle(Palette.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -55,7 +55,7 @@ struct ErrorText: View {
     }
 
     var body: some View {
-        Label(text, systemImage: "exclamationmark.circle.fill")
+        Label(LocalizedStringKey(text), systemImage: "exclamationmark.circle.fill")
             .font(.subheadline.weight(.medium))
             .foregroundStyle(Palette.pink)
     }
@@ -69,7 +69,7 @@ struct DemoHint: View {
     }
 
     var body: some View {
-        Label(text, systemImage: "sparkles")
+        Label(LocalizedStringKey(text), systemImage: "sparkles")
             .font(.footnote.weight(.medium))
             .foregroundStyle(Palette.mint)
             .padding(12)

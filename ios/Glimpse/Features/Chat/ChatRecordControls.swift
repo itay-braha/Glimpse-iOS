@@ -47,7 +47,7 @@ struct ChatRecordButton: View {
                         // Let go before the camera/mic was ready: that was a tap.
                         if started, !pressing, recorder.phase == .holding {
                             recorder.cancel()
-                            recorder.errorMessage = "Hold to record, release to send."
+                            recorder.errorMessage = String(localized: "Hold to record, release to send.")
                         }
                     }
                     return

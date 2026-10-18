@@ -32,8 +32,7 @@ enum GlimpseError: LocalizedError, Equatable {
     case freezeLimit
     case pinLimit
     case goldRequired
-    case ringLimit
-    case videoCallsOff
+    case ideaLimit
     case spotlightUsed
     case rewindLimit
     case cityNotOpen
@@ -43,33 +42,32 @@ enum GlimpseError: LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
-        case .notSignedIn: "Your session ended. Sign in again."
-        case .invalidPhoneNumber: "That doesn't look like a mobile number."
-        case .invalidCode: "That code didn't work. Check it and try again."
-        case .deviceBlocked: "This device can't be used for Glimpse."
-        case .deviceUnverified: "We couldn't verify this device. Try again on a real iPhone."
-        case .cameraUnavailable: "The camera isn't available on this device."
-        case .invalidEmbedLink: "That link isn't a public Instagram post or Reel, or a TikTok video."
-        case .videoAlreadyAdded: "That video is already on your profile."
-        case .hostedFirst: "Add a clip of your own first. Linked posts sit on top of it."
-        case .lastHostedClip: "Keep at least one clip of your own. Add another before removing this one."
-        case .clipTooOld: "That clip is more than a year old. Pick something from the last 12 months."
-        case .storyLink: "Stories disappear after 24 hours. Save it to your camera roll and upload it instead."
-        case .videoTooLarge: "That video is over 20 MB. Try a shorter clip."
-        case .outOfLikes: "You're out of likes for now."
-        case .rateLimited: "Whoa, slow down a little. Try again in a minute."
-        case .outOfViews: "You've seen today's glimpses."
-        case .paused: "Your profile is on a break. Resume it to keep exploring."
-        case .freezeLimit: "You've used your free freeze. Glimpse+ protects up to 3 connections."
-        case .pinLimit: "You can pin up to 3 conversations. Unpin one first."
-        case .goldRequired: "That's part of Glimpse Gold."
-        case .ringLimit: "Give it a little time before calling again."
-        case .videoCallsOff: "Turn on video calls in Settings first."
-        case .spotlightUsed: "Your next Spotlight is ready a week after the last one."
-        case .rewindLimit: "You've used today's 5 rewinds."
-        case .cityNotOpen: "Glimpse isn't open in that city yet."
-        case .plusRequired: "That's part of Glimpse+."
-        case .secondChanceLimit: "You can send one second chance a week."
+        case .notSignedIn: String(localized: "Your session ended. Sign in again.")
+        case .invalidPhoneNumber: String(localized: "That doesn't look like a mobile number.")
+        case .invalidCode: String(localized: "That code didn't work. Check it and try again.")
+        case .deviceBlocked: String(localized: "This device can't be used for Glimpse.")
+        case .deviceUnverified: String(localized: "We couldn't verify this device. Try again on a real iPhone.")
+        case .cameraUnavailable: String(localized: "The camera isn't available on this device.")
+        case .invalidEmbedLink: String(localized: "That link isn't a public Instagram post or Reel, or a TikTok video.")
+        case .videoAlreadyAdded: String(localized: "That video is already on your profile.")
+        case .hostedFirst: String(localized: "Add a clip of your own first. Linked posts sit on top of it.")
+        case .lastHostedClip: String(localized: "Keep at least one clip of your own. Add another before removing this one.")
+        case .clipTooOld: String(localized: "That clip is more than a year old. Pick something from the last 12 months.")
+        case .storyLink: String(localized: "Stories disappear after 24 hours. Save it to your camera roll and upload it instead.")
+        case .videoTooLarge: String(localized: "That video is over 20 MB. Try a shorter clip.")
+        case .outOfLikes: String(localized: "You're out of likes for now.")
+        case .rateLimited: String(localized: "Whoa, slow down a little. Try again in a minute.")
+        case .outOfViews: String(localized: "You've seen today's glimpses.")
+        case .paused: String(localized: "Your profile is on a break. Resume it to keep exploring.")
+        case .freezeLimit: String(localized: "You've used your free freeze. Glimpse+ protects up to 3 connections.")
+        case .pinLimit: String(localized: "You can pin up to 3 conversations. Unpin one first.")
+        case .goldRequired: String(localized: "That's part of Glimpse Gold.")
+        case .ideaLimit: String(localized: "That's today's ideas. More tomorrow.")
+        case .spotlightUsed: String(localized: "Your next Spotlight is ready a week after the last one.")
+        case .rewindLimit: String(localized: "You've used today's 5 rewinds.")
+        case .cityNotOpen: String(localized: "Glimpse isn't open in that city yet.")
+        case .plusRequired: String(localized: "That's part of Glimpse+.")
+        case .secondChanceLimit: String(localized: "You can send one second chance a week.")
         case let .message(text): text
         }
     }
@@ -79,6 +77,6 @@ enum GlimpseError: LocalizedError, Equatable {
         if let localized = error as? LocalizedError, let description = localized.errorDescription {
             return description
         }
-        return "Something went wrong. Try again."
+        return String(localized: "Something went wrong. Try again.")
     }
 }

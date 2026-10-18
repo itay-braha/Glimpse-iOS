@@ -2,18 +2,11 @@ import AVFoundation
 import Observation
 import UIKit
 
-/// Drives one call: lobby -> both ready -> peer connection -> hard stop at 00:00
-/// (anchored on server time). A 3-Minute Vibe Check ends in a private survey; a
-/// video call (up to 15 minutes, after a good Vibe Check) just ends.
+/// Drives one 3-Minute Vibe Check: lobby -> both ready -> peer connection ->
+/// hard stop at 00:00 (anchored on server time) -> private survey.
 @MainActor
 @Observable
 final class VibeCallModel {
-    enum Kind: Equatable {
-        case vibeCheck
-        /// A ringing or live video call.
-        case videoCall(UUID)
-    }
-
     enum Phase: Equatable {
         case preparing
         case lobby
@@ -23,19 +16,26 @@ final class VibeCallModel {
         case failed(String)
     }
 
+    /// General topics, after the ones drawn from both profiles.
     static let icebreakers = [
-        "Worst travel disaster?",
-        "The coffee order that reveals your true personality",
-        "What's the last thing that made you laugh out loud?",
-        "Most controversial food opinion?",
-        "Describe your perfect lazy Sunday",
-        "What were you obsessed with at 12?",
-        "Which song would play when you walk into a room?",
-        "Best thing you've eaten this month?",
+        String(localized: "Worst travel disaster?"),
+        String(localized: "The coffee order that reveals your true personality"),
+        String(localized: "What's the last thing that made you laugh out loud?"),
+        String(localized: "Most controversial food opinion?"),
+        String(localized: "Describe your perfect lazy Sunday"),
+        String(localized: "What were you obsessed with at 12?"),
+        String(localized: "Which song would play when you walk into a room?"),
+        String(localized: "Best thing you've eaten this month?"),
+        String(localized: "What's a small thing that makes your whole day?"),
+        String(localized: "Window seat or aisle, and defend it"),
+        String(localized: "The best advice you ever ignored"),
+        String(localized: "What would you do with a free Tuesday?"),
     ]
 
+    /// Topics on screen by default in a Vibe Check (one tap to hide, remembered).
+    static let topicsPreferenceKey = "vibe.topicsEnabled"
+
     let match: MatchSummary
-    let kind: Kind
     private(set) var phase: Phase = .preparing
     private(set) var meReady = false
     private(set) var otherReady = false
@@ -46,7 +46,11 @@ final class VibeCallModel {
     private(set) var localCaptureActive = false
     /// They are recording, or just took a screenshot: we stop sending video.
     private(set) var remoteCaptureActive = false
-    var icebreakerIndex = 0
+    /// Conversation topics: from both profiles first, then general ones.
+    private(set) var topics: [String] = VibeCallModel.icebreakers.shuffled()
+    private(set) var topicIndex = 0
+    /// On by default; one tap hides them (remembered for next time).
+    private(set) var showTopics = true
     /// Agreed to the private safety recording (required to join).
     var agreedToSafetyRecording = false
     /// Both videos are excluded from screenshots/recordings on this iOS version.
@@ -69,31 +73,11 @@ final class VibeCallModel {
     /// The participant with the lower id creates the offer, so exactly one side does.
     private var isOfferer: Bool { myID < match.otherUserID.uuidString.lowercased() }
 
-    var callID: UUID? {
-        switch kind {
-        case let .videoCall(id): id
-        case .vibeCheck: nil
-        }
-    }
-
-    var isVideoCall: Bool { callID != nil }
-
-    /// Call length: 3 minutes for a Vibe Check, up to 15 for a video call.
-    var totalSeconds: Int { isVideoCall ? 15 * 60 : 180 }
-
-    private var watchTask: Task<Void, Never>?
-
-    /// - Parameter recordingAgreed: for video calls, the safety recording is agreed once per match.
-    init(match: MatchSummary, myID: UUID, backend: any GlimpseBackend, kind: Kind = .vibeCheck, recordingAgreed: Bool = false) {
+    init(match: MatchSummary, myID: UUID, backend: any GlimpseBackend) {
         self.match = match
-        self.kind = kind
         self.myID = myID.uuidString.lowercased()
         self.backend = backend
-        icebreakerIndex = Int.random(in: 0..<Self.icebreakers.count)
-        if case .videoCall = kind {
-            secondsLeft = 15 * 60
-            agreedToSafetyRecording = recordingAgreed
-        }
+        showTopics = UserDefaults.standard.object(forKey: Self.topicsPreferenceKey) as? Bool ?? true
     }
 
     var clockText: String {
@@ -106,13 +90,13 @@ final class VibeCallModel {
         configureAudio(active: true)
         if !backend.isDemo {
             guard await CameraController.requestAccess() else {
-                phase = .failed("Glimpse needs camera and microphone access for the Vibe Check.")
+                phase = .failed(String(localized: "Glimpse needs camera and microphone access for the Vibe Check."))
                 return
             }
             do {
                 let servers = try await backend.vibeIceServers(matchID: match.matchID)
                 guard let client = WebRTCClient(iceServers: servers) else {
-                    phase = .failed("Couldn't start the video connection.")
+                    phase = .failed(String(localized: "Couldn't start the video connection."))
                     return
                 }
                 wire(client)
@@ -124,6 +108,7 @@ final class VibeCallModel {
             }
         }
 
+        await loadTopics()
         let channel = await backend.openVibeSignaling(matchID: match.matchID)
         signaling = channel
         listenTask = Task { [weak self] in
@@ -133,49 +118,12 @@ final class VibeCallModel {
         }
         observeScreenshots()
         phase = .lobby
-        if isVideoCall {
-            watchCall()
-            // Agreed before with this match: straight in, like a phone call.
-            if agreedToSafetyRecording { markReady() }
-        }
-    }
-
-    /// While a video call is ringing or live, notices if the other side declined,
-    /// missed it, blocked calls or hung up from another screen.
-    private func watchCall() {
-        guard let callID else { return }
-        let matchID = match.matchID
-        let name = match.displayName
-        watchTask = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(2))
-                guard let self, self.phase != .ended else { return }
-                guard let state = try? await self.backend.videoCallState(matchID: matchID) else { continue }
-                if state.activeCall?.id != callID {
-                    if self.phase == .live {
-                        self.end(sendHangup: false)
-                    } else {
-                        self.fail("\(name) can't talk right now.")
-                    }
-                    return
-                }
-            }
-        }
-    }
-
-    private func fail(_ message: String) {
-        end(sendHangup: false)
-        phase = .failed(message)
     }
 
     /// "I'm ready": announced until the other side answers, so late joiners still see it.
     func markReady() {
         guard !meReady, agreedToSafetyRecording else { return }
         meReady = true
-        if isVideoCall {
-            let matchID = match.matchID
-            Task { try? await backend.agreeVideoCallRecording(matchID: matchID) }
-        }
         readyPingTask = Task { [weak self] in
             while let self, !Task.isCancelled, !self.otherReady || !self.offerSent && self.isOfferer {
                 await self.send(VibeSignal(kind: .ready, sender: ""))
@@ -189,11 +137,6 @@ final class VibeCallModel {
     func end(sendHangup: Bool = true) {
         guard phase != .ended else { return }
         phase = .ended
-        watchTask?.cancel()
-        if let callID {
-            let backend = backend
-            Task { await backend.endVideoCall(callID: callID) }
-        }
         clockTask?.cancel()
         readyPingTask?.cancel()
         listenTask?.cancel()
@@ -216,8 +159,26 @@ final class VibeCallModel {
         configureAudio(active: false)
     }
 
-    func nextIcebreaker() {
-        icebreakerIndex = (icebreakerIndex + 1) % Self.icebreakers.count
+    var currentTopic: String {
+        topics.isEmpty ? Self.icebreakers[0] : topics[topicIndex % topics.count]
+    }
+
+    func nextTopic() {
+        topicIndex = (topicIndex + 1) % max(topics.count, 1)
+    }
+
+    /// Hiding (or showing) topics is remembered for future Vibe Checks.
+    func setShowTopics(_ show: Bool) {
+        showTopics = show
+        UserDefaults.standard.set(show, forKey: Self.topicsPreferenceKey)
+    }
+
+    /// Topics from both profiles (their clips, what you both wrote, your city) lead.
+    private func loadTopics() async {
+        let personal = (try? await backend.vibeTopics(matchID: match.matchID)) ?? []
+        let general = Self.icebreakers.filter { !personal.contains($0) }.shuffled()
+        topics = personal.shuffled() + general
+        topicIndex = 0
     }
 
     // MARK: Signaling
@@ -302,17 +263,12 @@ final class VibeCallModel {
         readyPingTask?.cancel()
         startRecording()
         do {
-            let clock: VibeClock
-            if let callID {
-                clock = try await backend.videoCallClock(callID: callID)
-            } else {
-                clock = try await backend.vibeMarkStarted(matchID: match.matchID)
-            }
+            let clock = try await backend.vibeMarkStarted(matchID: match.matchID)
             // Translate the server's end time into local time (clock skew safe).
             let skew = clock.serverNow.timeIntervalSinceNow
             endsAt = clock.endsAt.addingTimeInterval(-skew)
         } catch {
-            endsAt = Date.now.addingTimeInterval(Double(totalSeconds))
+            endsAt = Date.now.addingTimeInterval(180)
         }
         startClock()
     }
@@ -380,11 +336,10 @@ final class VibeCallModel {
     private func startRecording() {
         guard let client, recorders.isEmpty else { return }
         let matchID = match.matchID
-        let callID = callID
         let backend = backend
         let deliver: @Sendable (VibeSafetyRecorder.Segment) -> Void = { segment in
             Task { @MainActor in
-                VibeRecordingUploads.enqueue(segment, matchID: matchID, callID: callID)
+                VibeRecordingUploads.enqueue(segment, matchID: matchID)
                 if segment.stream == .own {
                     await VibeRecordingUploads.uploadPending(using: backend)
                 }

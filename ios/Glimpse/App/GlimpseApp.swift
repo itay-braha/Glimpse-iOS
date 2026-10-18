@@ -15,6 +15,7 @@ struct GlimpseApp: App {
         WindowGroup {
             RootView()
                 .environment(app)
+                .onAppear { ScreenRecordingShield.shared.start() }
                 .preferredColorScheme(.dark)
                 .tint(Palette.mint)
         }

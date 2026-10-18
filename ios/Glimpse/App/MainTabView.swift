@@ -23,6 +23,11 @@ struct MainTabView: View {
                 Task { await app.choseAlerts(scope) }
             }
         }
+        .sheet(isPresented: $app.needsTermsAcceptance) {
+            TermsUpdateSheet {
+                Task { await app.acceptUpdatedTerms() }
+            }
+        }
         .sheet(item: $app.alertNudge) { nudge in
             AlertNudgeSheet(nudge: nudge) { accepted, never in
                 Task { await app.answerNudge(nudge, accepted: accepted, never: never) }

@@ -71,9 +71,19 @@ final class FlowTests: XCTestCase {
     // A -> F: a brand-new member gets from the welcome screen to the feed.
     func testOnboardingToFeed() {
         let app = launch("welcome")
-        XCTAssertTrue(app.buttons["Get started"].waitForExistence(timeout: 15))
+        let start = app.buttons["Get started"]
+        XCTAssertTrue(start.waitForExistence(timeout: 15))
         snap("1-1 Welcome")
-        app.buttons["Get started"].tap()
+        // Two explicit agreements before anything else: 18+ and the terms, and sensitive data.
+        XCTAssertFalse(start.isEnabled)
+        for id in ["consent.terms", "consent.sensitive"] {
+            let toggle = app.switches[id]
+            XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+            toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        }
+        XCTAssertTrue(start.isEnabled)
+        snap("1-1b Agreed")
+        start.tap()
 
         let phone = app.textFields["Mobile number"]
         XCTAssertTrue(phone.waitForExistence(timeout: 5))
@@ -182,6 +192,15 @@ final class FlowTests: XCTestCase {
         XCTAssertTrue(app.buttons["End now and report"].waitForExistence(timeout: 15))
         pause(1)
         snap("3-6 Live call")
+        // Topics are on by default: tap for a new one, × to hide, "Topics" to bring them back.
+        let nextTopic = app.buttons["vibe.nextTopic"]
+        XCTAssertTrue(nextTopic.waitForExistence(timeout: 5))
+        nextTopic.tap()
+        app.buttons["vibe.hideTopics"].tap()
+        let showTopics = app.buttons["vibe.showTopics"]
+        XCTAssertTrue(showTopics.waitForExistence(timeout: 3))
+        snap("3-6b Topics hidden")
+        showTopics.tap()
         pause(6)
         snap("3-7 Countdown running")
         app.buttons["Hang up"].tap()
@@ -205,12 +224,12 @@ final class FlowTests: XCTestCase {
         snap("4-1 Liked you: everyone, free")
     }
 
-    // Videos are kept out of screenshots; Glimpse Gold: Rewind and the Gold hub.
+    // Glimpse Gold: Rewind and the Gold hub.
     func testCaptureProtectionAndGold() {
         let app = launch("feed", protectMedia: true)
         XCTAssertTrue(app.buttons["Glimpse"].firstMatch.waitForExistence(timeout: 20))
         pause(3)
-        snap("11-1 A screenshot of the feed: the video comes out blank")
+        snap("11-1 Feed")
 
         let first = currentName(app)
         app.swipeUp()
@@ -240,38 +259,58 @@ final class FlowTests: XCTestCase {
         snap("11-4 Gold hub before upgrading")
     }
 
-    // After a good Vibe Check (and her yes): a 15-minute video call, blockable any time.
-    func testVideoCallAfterVibeCheck() {
-        let app = launch("videoCall")
-        let call = app.buttons["chat.videoCall"]
-        XCTAssertTrue(call.waitForExistence(timeout: 20))
-        snap("12-1 Video call, after a good Vibe Check")
-        call.tap()
+    // After a good Vibe Check: a first-date idea, the same for both of them.
+    func testDateIdeaAfterVibeCheck() {
+        let app = launch("dateIdea")
+        XCTAssertTrue(app.descendants(matching: .any)["dateIdea"].waitForExistence(timeout: 20))
+        snap("12-1 A first-date idea after a good Vibe Check")
+        app.buttons["dateIdea.another"].tap()
+        pause(1)
+        snap("12-2 Another idea")
+        app.buttons["dateIdea.send"].tap()
+        XCTAssertTrue(text(app, containing: "How about").waitForExistence(timeout: 5)
+            || app.textViews.firstMatch.exists, "suggesting it drafts a message")
+        snap("12-3 Suggest it in the chat")
+    }
 
-        let ready = app.buttons["I'm ready"]
-        XCTAssertTrue(ready.waitForExistence(timeout: 10))
-        let agree = app.switches["vibe.agree"]
-        XCTAssertTrue(agree.waitForExistence(timeout: 5))
-        agree.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
-        snap("12-2 First call with her: recording agreed once")
-        ready.tap()
+    // Hebrew, right to left: brand names stay in Latin, layout mirrors, swipes stay physical.
+    func testHebrew() {
+        func hebrew(_ screen: String) -> XCUIApplication {
+            let app = XCUIApplication()
+            app.launchArguments = ["-demo", "-screen", screen, "-allowCapture", "-AppleLanguages", "(he)", "-AppleLocale", "he_IL"]
+            app.launch()
+            return app
+        }
+        continueAfterFailure = false
 
-        let hangUp = app.buttons["Hang up"]
-        XCTAssertTrue(hangUp.waitForExistence(timeout: 15))
-        let clock = text(app, containing: "seconds left")
-        XCTAssertTrue(clock.waitForExistence(timeout: 5))
-        let seconds = Int(clock.label.prefix { $0.isNumber }) ?? 0
-        XCTAssertGreaterThan(seconds, 600, "the clock runs from 15 minutes")
-        snap("12-3 Live: up to 15 minutes")
-        hangUp.tap()
+        var app = hebrew("welcome")
+        XCTAssertTrue(app.buttons["בואו נתחיל"].waitForExistence(timeout: 20), "the welcome screen is in Hebrew")
+        snap("13-1 Hebrew: welcome and consent")
+        app.terminate()
 
-        XCTAssertTrue(call.waitForExistence(timeout: 10))
-        app.buttons["More"].tap()
-        let block = app.buttons["Block video calls"]
-        XCTAssertTrue(block.waitForExistence(timeout: 5))
-        snap("12-4 Block video calls any time")
-        block.tap()
-        XCTAssertTrue(waitUntilGone(call, timeout: 10), "blocking removes the call button")
+        app = hebrew("feed")
+        XCTAssertTrue(app.buttons["Glimpse"].firstMatch.waitForExistence(timeout: 20))
+        pause(3)
+        snap("13-2 Hebrew: feed")
+        app.terminate()
+
+        app = hebrew("chat")
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "bubble.incoming").firstMatch.waitForExistence(timeout: 20))
+        pause(1)
+        snap("13-3 Hebrew: chat")
+        app.terminate()
+
+        app = hebrew("settings")
+        XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 20))
+        let terms = app.buttons["תנאי שימוש"]
+        for _ in 0..<6 where !(terms.exists && terms.isHittable) {
+            app.swipeUp()
+        }
+        XCTAssertTrue(terms.waitForExistence(timeout: 5))
+        snap("13-4 Hebrew: settings")
+        terms.tap()
+        XCTAssertTrue(text(app, containing: "תנאי שימוש אלה").waitForExistence(timeout: 10), "the terms are in Hebrew")
+        snap("13-5 Hebrew: terms of service")
     }
 
     // A rare alert offer, pinning a chat, and the report confirmation.

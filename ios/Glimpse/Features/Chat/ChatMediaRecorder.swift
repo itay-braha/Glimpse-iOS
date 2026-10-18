@@ -81,7 +81,7 @@ final class ChatMediaRecorder {
         if demoFallback { return false }
         #endif
         guard await AVAudioApplication.requestRecordPermission() else {
-            errorMessage = "Glimpse needs microphone access for voice messages. You can turn it on in Settings."
+            errorMessage = String(localized: "Glimpse needs microphone access for voice messages. You can turn it on in Settings.")
             return false
         }
         let session = AVAudioSession.sharedInstance()
@@ -105,7 +105,7 @@ final class ChatMediaRecorder {
     private func startVideo() async -> Bool {
         guard CameraController.isAvailable else { return false }
         guard await CameraController.requestAccess() else {
-            errorMessage = "Glimpse needs camera and microphone access for video messages. You can turn it on in Settings."
+            errorMessage = String(localized: "Glimpse needs camera and microphone access for video messages. You can turn it on in Settings.")
             return false
         }
         do {
@@ -151,7 +151,7 @@ final class ChatMediaRecorder {
         stopCapture()
         defer { reset() }
         guard duration >= MessageKind.minDuration else {
-            errorMessage = "Hold to record, release to send."
+            errorMessage = String(localized: "Hold to record, release to send.")
             return nil
         }
 
@@ -166,7 +166,7 @@ final class ChatMediaRecorder {
         if demoFallback, let sample = DemoData.chatSample(kind) {
             return Recording(kind: kind, fileURL: sample, duration: min(duration, kind.maxDuration))
         }
-        errorMessage = "That recording didn't work. Try again."
+        errorMessage = String(localized: "That recording didn't work. Try again.")
         return nil
     }
 

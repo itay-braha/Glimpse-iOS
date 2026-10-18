@@ -152,7 +152,7 @@ struct UploadVideoView: View {
         }
     }
 
-    private func working(_ text: String) -> some View {
+    private func working(_ text: LocalizedStringKey) -> some View {
         VStack(spacing: 14) {
             ProgressView().controlSize(.large)
             Text(text).foregroundStyle(Palette.textSecondary)
@@ -189,7 +189,7 @@ final class UploadVideoModel {
     func load(_ item: PhotosPickerItem) async {
         errorMessage = nil
         guard Self.isAccepted(item.supportedContentTypes) else {
-            errorMessage = "Pick an MP4 or MOV video."
+            errorMessage = String(localized: "Pick an MP4 or MOV video.")
             return
         }
         let previous = state
@@ -227,6 +227,12 @@ final class UploadVideoModel {
         errorMessage = nil
         state = .uploading
         do {
+            // On phones with Sensitive Content Warning on, nudity is caught before it leaves the phone.
+            if try await SensitiveContentChecker.shared.isSensitive(review.fileURL) {
+                errorMessage = String(localized: "This video looks like it may contain nudity, which isn't allowed on Glimpse.")
+                state = .review(review)
+                return nil
+            }
             var clip = try await VideoCompressor.prepare(review.fileURL, source: .upload, filmedAt: review.inspection.filmedAt)
             clip.promptKey = prompt?.rawValue
             return try await backend.uploadClip(clip)
@@ -264,7 +270,7 @@ private struct RequirementRow: View {
 
     var body: some View {
         Label {
-            Text(text).foregroundStyle(Palette.textPrimary)
+            Text(LocalizedStringKey(text)).foregroundStyle(Palette.textPrimary)
         } icon: {
             Image(systemName: symbol).foregroundStyle(Palette.mint)
         }
@@ -300,7 +306,7 @@ private struct CheckRow: View {
 
     var body: some View {
         Label {
-            Text(text).foregroundStyle(Palette.textPrimary)
+            Text(LocalizedStringKey(text)).foregroundStyle(Palette.textPrimary)
         } icon: {
             Image(systemName: symbolName)
                 .foregroundStyle(tint)

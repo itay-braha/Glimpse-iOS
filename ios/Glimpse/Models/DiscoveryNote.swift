@@ -15,10 +15,10 @@ enum DiscoveryNote: String, Codable, Sendable {
 
     var text: String {
         switch self {
-        case .widerDistance: "A little further than usual"
-        case .outsideAge: "Just outside your age range"
-        case .secondLook: "Second look · new moments"
-        case .other: "Suggested for you"
+        case .widerDistance: String(localized: "A little further than usual")
+        case .outsideAge: String(localized: "Just outside your age range")
+        case .secondLook: String(localized: "Second look · new moments")
+        case .other: String(localized: "Suggested for you")
         }
     }
 

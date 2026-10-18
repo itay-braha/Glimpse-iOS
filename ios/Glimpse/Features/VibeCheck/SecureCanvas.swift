@@ -18,9 +18,10 @@ final class SecureCanvas: UIView {
 
     private let field = UITextField()
 
-    /// Whether videos people watch in the app are kept out of captures (always,
-    /// except scripted screenshot runs that pass `-allowCapture`).
-    static var protectsMedia: Bool { !LaunchOptions.current.allowCapture }
+    /// Whether profile videos and video notes are also kept out of captures. Off:
+    /// screenshots are allowed there, and screen recording is blocked app-wide by
+    /// `ScreenRecordingShield`. Vibe Check calls always use the protected layer.
+    static var protectsMedia: Bool { false }
 
     override convenience init(frame: CGRect) {
         self.init(frame: frame, protect: true)

@@ -3,14 +3,15 @@ import SwiftUI
 struct ChatView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
+    /// Date ideas someone closed (by id), so the card stays away.
+    @AppStorage("dateIdeas.dismissed") private var dismissedDateIdeas = ""
     @State private var model: ChatModel
     @State private var showReport = false
     @State private var confirmUnmatch = false
     @State private var showExitSurvey = false
     @State private var showPropose = false
     @State private var showCall = false
-    @State private var videoCall: VideoCallLaunch?
-    @AppStorage("videoCalls.tipShown") private var videoCallsTipShown = false
     @State private var showVibeInfo = false
     @State private var friendlyFollowUp = false
     @State private var recorder = ChatMediaRecorder()
@@ -96,20 +97,27 @@ struct ChatView: View {
         .background(Palette.midnight)
         .safeAreaInset(edge: .top) {
             VStack(spacing: 0) {
-            if let call = model.calls?.activeCall, call.status == .ringing, call.callerID != myID, !model.hasEnded {
-                IncomingCallCard(
-                    name: model.match.displayName,
-                    onAnswer: {
-                        Task { videoCall = await model.answer(call, accept: true, using: app.backend) }
+            if let idea = model.dateIdea, !dismissedDateIdeas.contains(idea.id.uuidString) {
+                DateIdeaCard(
+                    idea: idea,
+                    onDirections: { url in
+                        Task { await app.backend.logDateIdea(idea.id, feedback: .openMaps) }
+                        openURL(url)
                     },
-                    onDecline: {
-                        Task { _ = await model.answer(call, accept: false, using: app.backend) }
+                    onSendToChat: { text in
+                        Task { await app.backend.logDateIdea(idea.id, feedback: .shared) }
+                        model.draft = text
+                        composerFocused = true
+                    },
+                    onAnother: {
+                        Task { await model.anotherDateIdea(using: app.backend) }
+                    },
+                    onDismiss: {
+                        Task { await app.backend.logDateIdea(idea.id, feedback: .notForUs) }
+                        dismissedDateIdeas += idea.id.uuidString + ","
                     }
                 )
                 .background(Palette.midnight)
-            } else if showVideoCallsTip {
-                VideoCallsTipCard(name: model.match.displayName) { videoCallsTipShown = true }
-                    .background(Palette.midnight)
             }
             if let vibe = model.vibe, !model.hasEnded {
                 VibeCheckBanner(
@@ -173,19 +181,9 @@ struct ChatView: View {
                 }
                 .accessibilityElement(children: .combine)
             }
-            if let calls = model.calls, calls.available, !model.hasEnded {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Video call", systemImage: "video.fill") {
-                        Task { await startVideoCall(calls) }
-                    }
-                    .tint(Palette.mint)
-                    .accessibilityIdentifier("chat.videoCall")
-                }
-            }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu("More", systemImage: "ellipsis.circle") {
-                    videoCallMenu
-                    Button(model.isFrozen ? "Unfreeze" : "Freeze connection", systemImage: "snowflake") {
+                    Button(model.isFrozen ? String(localized: "Unfreeze") : String(localized: "Freeze connection"), systemImage: "snowflake") {
                         Task {
                             do {
                                 try await model.toggleFreeze(using: app.backend)
@@ -264,19 +262,7 @@ struct ChatView: View {
                 }
             }
         }
-        .task { await model.watchCalls(using: app.backend) }
-        .fullScreenCover(item: $videoCall, onDismiss: {
-            Task { await model.refreshCalls(using: app.backend) }
-        }) { launch in
-            if let myID {
-                VibeCallView(
-                    match: model.match, myID: myID, backend: app.backend,
-                    kind: .videoCall(launch.callID), recordingAgreed: launch.recordingAgreed
-                ) { outcome in
-                    if outcome == .report { showReport = true }
-                }
-            }
-        }
+        .task { await model.refreshDateIdea(using: app.backend) }
         .fullScreenCover(isPresented: $showCall) {
             if let myID {
                 VibeCallView(match: model.match, myID: myID, backend: app.backend) { outcome in
@@ -437,10 +423,10 @@ struct ChatView: View {
         }
         let date = message.createdAt
         if Calendar.current.isDateInToday(date) {
-            return "Today \(date.formatted(date: .omitted, time: .shortened))"
+            return String(localized: "Today \(date.formatted(date: .omitted, time: .shortened))")
         }
         if Calendar.current.isDateInYesterday(date) {
-            return "Yesterday \(date.formatted(date: .omitted, time: .shortened))"
+            return String(localized: "Yesterday \(date.formatted(date: .omitted, time: .shortened))")
         }
         return date.formatted(.dateTime.weekday(.abbreviated).month().day().hour().minute())
     }
@@ -459,54 +445,12 @@ struct ChatView: View {
     private var vibeInfoText: String {
         guard let vibe = model.vibe else { return "Vibe Checks unlock when the conversation flows naturally." }
         if vibe.status == .disabled {
-            return "The Vibe Check isn't available in this conversation."
+            return String(localized: "The Vibe Check isn't available in this conversation.")
         }
         if vibe.iHoldKey {
-            return "When the conversation is flowing, you can invite \(model.match.displayName) to a 3-minute video chat, or give the green light for them to suggest a time. It ends on its own after 3 minutes."
+            return String(localized: "When the conversation is flowing, you can invite \(model.match.displayName) to a 3-minute video chat, or give the green light for them to suggest a time. It ends on its own after 3 minutes.")
         }
-        return "Vibe Checks unlock when the conversation flows naturally."
-    }
-
-    // MARK: Video calls
-
-    /// One-time pointer to Settings for whoever decides on video calls here.
-    private var showVideoCallsTip: Bool {
-        guard !videoCallsTipShown, !model.hasEnded, let calls = model.calls else { return false }
-        return calls.iHoldKey && !calls.myGlobalEnabled && calls.reason == .notEnabled
-    }
-
-    private func startVideoCall(_ calls: VideoCallState) async {
-        guard calls.canRing else {
-            if let next = calls.ringAvailableAt {
-                model.errorMessage = "You can call again \(next.formatted(.relative(presentation: .named)))."
-            } else if calls.callsToday >= calls.callsPerDay {
-                model.errorMessage = "That's today's \(calls.callsPerDay) calls. More tomorrow."
-            }
-            return
-        }
-        app.track("video_call_started")
-        videoCall = await model.ring(using: app.backend)
-    }
-
-    /// Per-match switches, in the chat's "More" menu: allow (whoever holds the key,
-    /// once video calls are on in Settings) and block (anyone, any time).
-    @ViewBuilder
-    private var videoCallMenu: some View {
-        if let calls = model.calls, calls.isRelevant || calls.blockedByMe {
-            Section("Video calls") {
-                if calls.iHoldKey && calls.myGlobalEnabled && !calls.blockedByMe {
-                    Button(calls.iAllowed ? "Stop video calls with \(model.match.displayName)" : "Allow video calls with \(model.match.displayName)",
-                           systemImage: calls.iAllowed ? "video.slash" : "video.badge.checkmark") {
-                        Task { await model.setCallsAllowed(!calls.iAllowed, using: app.backend) }
-                    }
-                }
-                Button(calls.blockedByMe ? "Unblock video calls" : "Block video calls",
-                       systemImage: calls.blockedByMe ? "video" : "video.slash.fill",
-                       role: calls.blockedByMe ? nil : .destructive) {
-                    Task { await model.setCallsBlocked(!calls.blockedByMe, using: app.backend) }
-                }
-            }
-        }
+        return String(localized: "Vibe Checks unlock when the conversation flows naturally.")
     }
 
     private func handleVibeOutcome(_ outcome: VibeOutcome?) {
@@ -518,6 +462,7 @@ struct ChatView: View {
         Task {
             _ = try? await app.backend.vibeSubmitResult(matchID: model.match.matchID, outcome: outcome)
             await model.refreshVibe(using: app.backend)
+            await model.refreshDateIdea(using: app.backend)
             app.matchesDidChange()
         }
         switch outcome {

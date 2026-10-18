@@ -127,7 +127,7 @@ struct FieldLabel: View {
     }
 
     var body: some View {
-        Text(text)
+        Text(LocalizedStringKey(text))
             .font(.glimpseCaption)
             .textCase(.uppercase)
             .foregroundStyle(Palette.textTertiary)

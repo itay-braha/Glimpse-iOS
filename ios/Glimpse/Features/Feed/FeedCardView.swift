@@ -34,6 +34,7 @@ struct FeedCardView: View {
     @State private var health = EmbedHealth.shared
     @AppStorage(PlaybackPreferences.clipSecondsKey) private var clipSeconds = PlaybackPreferences.defaultClipSeconds
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.layoutDirection) private var layoutDirection
 
     private static let swipeThreshold: CGFloat = 110
 
@@ -54,6 +55,11 @@ struct FeedCardView: View {
         return showFullClip ? length : min(clipSeconds, length)
     }
 
+    /// The hosted clip on screen (linked posts play in their platform's own player).
+    private var sensitiveCheckURL: URL? {
+        video?.storagePath.flatMap { playableURLs[$0] }
+    }
+
     /// Seconds left after the clip time, offered behind "+Ns".
     private var moreSeconds: Int {
         guard let length = video?.durationSeconds, video?.isEmbed == false, !showFullClip else { return 0 }
@@ -63,6 +69,9 @@ struct FeedCardView: View {
 
     var body: some View {
         ZStack {
+            // Viewers with Sensitive Content Warning on get a warning over possible nudity.
+            SensitiveVideoGate(url: sensitiveCheckURL) {
+            ZStack {
             poster
 
             if let video, let path = video.storagePath, let url = playableURLs[path] {
@@ -119,6 +128,12 @@ struct FeedCardView: View {
                 .padding(.bottom, insets.bottom + 18)
             }
 
+            }
+            }
+            // Content follows the reading direction (in Hebrew, tapping left is the next clip);
+            // swipes stay physical everywhere: right is like, left is pass.
+            .environment(\.layoutDirection, layoutDirection)
+
             swipeStamp
 
             HeartBurst(trigger: burstID, reduceMotion: reduceMotion)
@@ -127,6 +142,7 @@ struct FeedCardView: View {
         .offset(x: dragX)
         .rotationEffect(.degrees(reduceMotion ? 0 : Double(dragX / 30)), anchor: .bottom)
         .simultaneousGesture(swipeGesture)
+        .environment(\.layoutDirection, .leftToRight)
         .onChange(of: preferences.isMuted) { _, muted in
             if isActive, !muted { FeedSignals.shared.record(.unmute, target: profile.id) }
         }
@@ -416,7 +432,7 @@ private struct RailButton: View {
                     .frame(width: size, height: size)
                     .background(background, in: .circle)
                     .shadow(color: background.opacity(0.4), radius: 12)
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(.white)
             }

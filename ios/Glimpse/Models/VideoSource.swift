@@ -12,8 +12,8 @@ enum VideoSource: String, Codable, Sendable {
         switch self {
         case .instagram: "Instagram"
         case .tiktok: "TikTok"
-        case .native: "Recorded on Glimpse"
-        case .upload: "Uploaded"
+        case .native: String(localized: "Recorded on Glimpse")
+        case .upload: String(localized: "Uploaded")
         }
     }
 

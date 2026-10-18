@@ -95,11 +95,11 @@ struct PaywallView: View {
 
     private var headline: String {
         switch reason {
-        case .outOfViews: "See more people today."
-        case .gold: tier == .gold ? "Be seen. Go further." : "More glimpses, less waiting."
-        case .freeze: "Protect the ones that matter."
-        case .secondChance: "Everyone deserves a second chance."
-        case .settings: "More glimpses, less waiting."
+        case .outOfViews: String(localized: "See more people today.")
+        case .gold: tier == .gold ? String(localized: "Be seen. Go further.") : String(localized: "More glimpses, less waiting.")
+        case .freeze: String(localized: "Protect the ones that matter.")
+        case .secondChance: String(localized: "Everyone deserves a second chance.")
+        case .settings: String(localized: "More glimpses, less waiting.")
         }
     }
 
@@ -112,7 +112,7 @@ struct PaywallView: View {
                         if await store.purchaseDemo(tier, backend: app.backend) { finish() }
                     }
                 } label: {
-                    Text(app.isDemo ? "Try \(tier.title) (demo)" : "\(tier.title) isn't available yet")
+                    Text(app.isDemo ? String(localized: "Try \(tier.title) (demo)") : String(localized: "\(tier.title) isn't available yet"))
                 }
                 .buttonStyle(.glimpse)
                 .disabled(!app.isDemo)
@@ -197,8 +197,8 @@ private struct Benefit: View {
                 .frame(width: 28)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.glimpseHeadline)
-                Text(detail).font(.subheadline).foregroundStyle(Palette.textSecondary)
+                Text(LocalizedStringKey(title)).font(.glimpseHeadline)
+                Text(LocalizedStringKey(detail)).font(.subheadline).foregroundStyle(Palette.textSecondary)
             }
         }
         .accessibilityElement(children: .combine)
