@@ -26,7 +26,7 @@ struct ChatRecordButton: View {
             .gesture(hold)
             .sensoryFeedback(.impact(weight: .medium), trigger: startTrigger)
             .accessibilityElement()
-            .accessibilityLabel(kind == .voice ? "Record voice message" : "Record video message")
+            .accessibilityLabel(kind == .voice ? String(localized: "Record voice message") : String(localized: "Record video message"))
             .accessibilityHint("Hold to record, release to send. Slide left to cancel, up to lock.")
             .accessibilityAddTraits(.isButton)
             .accessibilityAction {

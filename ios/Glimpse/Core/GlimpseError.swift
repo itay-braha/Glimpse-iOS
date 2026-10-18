@@ -33,6 +33,8 @@ enum GlimpseError: LocalizedError, Equatable {
     case pinLimit
     case goldRequired
     case ideaLimit
+    case datePaused
+    case dateExists
     case spotlightUsed
     case rewindLimit
     case cityNotOpen
@@ -63,6 +65,8 @@ enum GlimpseError: LocalizedError, Equatable {
         case .pinLimit: String(localized: "You can pin up to 3 conversations. Unpin one first.")
         case .goldRequired: String(localized: "That's part of Glimpse Gold.")
         case .ideaLimit: String(localized: "That's today's ideas. More tomorrow.")
+        case .datePaused: String(localized: "You can plan dates again soon.")
+        case .dateExists: String(localized: "You already have a date planned. Cancel it to pick another.")
         case .spotlightUsed: String(localized: "Your next Spotlight is ready a week after the last one.")
         case .rewindLimit: String(localized: "You've used today's 5 rewinds.")
         case .cityNotOpen: String(localized: "Glimpse isn't open in that city yet.")

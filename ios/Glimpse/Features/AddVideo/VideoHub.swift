@@ -42,8 +42,8 @@ struct VideoHubOptions: View {
             VideoSourceCard(
                 title: "Link from Instagram or TikTok",
                 detail: canLink
-                    ? "A public Reel or TikTok from the last year. We'll walk you through it."
-                    : "Unlocks after your first clip. Links sit on top of a clip of your own.",
+                    ? String(localized: "A public Reel or TikTok from the last year. We'll walk you through it.")
+                    : String(localized: "Unlocks after your first clip. Links sit on top of a clip of your own."),
                 action: { onSelect(.embed) }
             ) {
                 ZStack {

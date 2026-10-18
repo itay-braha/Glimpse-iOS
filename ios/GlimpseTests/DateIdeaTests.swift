@@ -54,3 +54,37 @@ struct SensitiveContentTests {
         #expect(try await checker.isSensitive(remoteURLString: "https://example.invalid/clip.mp4") == false)
     }
 }
+
+/// Planning a date from an idea (the server enforces the same rules; see pgTAP).
+struct PlannedDateTests {
+    @Test func proposeThenTheyAccept() async throws {
+        let backend = DemoBackend(seeded: true, vibeVerified: true)
+        let match = try #require(try await backend.fetchMatches().first)
+        let idea = try #require(try await backend.dateIdea(matchID: match.matchID))
+        let plan = try await backend.proposeDate(matchID: match.matchID, ideaID: idea.id, at: .now.addingTimeInterval(86_400))
+        #expect(plan.status == .proposed)
+        #expect(plan.place == idea.spot?.name)
+        try await Task.sleep(for: .seconds(2))
+        #expect(try await backend.plannedDate(matchID: match.matchID)?.status == .confirmed)
+        #expect(try await backend.myPlannedDates().count == 1)
+        await #expect(throws: GlimpseError.dateExists) {
+            try await backend.proposeDate(matchID: match.matchID, ideaID: idea.id, at: .now.addingTimeInterval(2 * 86_400))
+        }
+    }
+
+    @Test func surveysAtMostWeekly() {
+        let defaults = UserDefaults(suiteName: "survey-\(UUID().uuidString)")!
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        #expect(SurveyPacing.mayAsk(now: start, defaults: defaults))
+        SurveyPacing.recordAsked(now: start, defaults: defaults)
+        #expect(!SurveyPacing.mayAsk(now: start.addingTimeInterval(3 * 86_400), defaults: defaults))
+        #expect(SurveyPacing.mayAsk(now: start.addingTimeInterval(8 * 86_400), defaults: defaults))
+    }
+
+    @Test func theReportMenuIsGroupedAndLeavesOutGenderClaims() {
+        let offered = ReportReason.menu.flatMap(\.1)
+        #expect(offered.contains(.unsafeInPerson))
+        #expect(offered.contains(.selling))
+        #expect(!offered.contains(.ghosting), "no-shows are asked about after a date instead")
+    }
+}

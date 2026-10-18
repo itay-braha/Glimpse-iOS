@@ -11,6 +11,8 @@ final class MatchesModel {
     private(set) var secondChances: [SecondChance] = []
     private(set) var missedCount = 0
     private(set) var pinned: Set<UUID> = []
+    /// Planned dates by match, for the date chip on each row.
+    private(set) var dates: [UUID: UpcomingDate] = [:]
     private(set) var isLoading = false
     private(set) var hasLoaded = false
     var errorMessage: String?
@@ -39,6 +41,9 @@ final class MatchesModel {
             }
             matches = fresh
             pinned = (try? await backend.pinnedMatchIDs()) ?? pinned
+            if let upcoming = try? await backend.myPlannedDates() {
+                dates = Dictionary(upcoming.map { ($0.matchID, $0) }, uniquingKeysWith: { first, _ in first })
+            }
             errorMessage = nil
             notices = ((try? await backend.notifications()) ?? [])
                 .filter { $0.readAt == nil && $0.kind == .connectionEnded }

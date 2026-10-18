@@ -120,6 +120,16 @@ protocol GlimpseBackend: AnyObject, Sendable {
     func nextDateIdea(matchID: UUID) async throws -> DateIdea?
     func logDateIdea(_ ideaID: UUID, feedback: DateIdea.Feedback) async
 
+    // MARK: Planned dates
+    /// The plan in this chat: upcoming, or recent and waiting for my check-in.
+    func plannedDate(matchID: UUID) async throws -> PlannedDate?
+    func proposeDate(matchID: UUID, ideaID: UUID, at date: Date) async throws -> PlannedDate
+    func respondDate(_ dateID: UUID, accept: Bool) async throws -> PlannedDate
+    func cancelDate(_ dateID: UUID) async throws
+    func myPlannedDates() async throws -> [UpcomingDate]
+    /// Private: did they show up?
+    func checkInDate(_ dateID: UUID, outcome: DateOutcome) async throws
+
     /// A screenshot or screen-recording attempt during a call, for the safety team.
     func logVibeCapture(matchID: UUID, kind: String) async
 

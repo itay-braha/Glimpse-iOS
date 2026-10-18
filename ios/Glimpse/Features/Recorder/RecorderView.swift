@@ -129,7 +129,7 @@ struct RecorderView: View {
             HStack(spacing: 12) {
                 Button("Retake") { model.retake() }
                     .buttonStyle(.glimpseSecondary)
-                Button(model.purpose == .profileClip ? "Use this clip" : "Submit for review") {
+                Button(model.purpose == .profileClip ? String(localized: "Use this clip") : String(localized: "Submit for review")) {
                     Task {
                         let result = await model.upload(using: app.backend)
                         if result.succeeded {
@@ -240,6 +240,6 @@ private struct RecordButton: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(startedAt == nil ? "Start recording" : "Stop recording")
+        .accessibilityLabel(startedAt == nil ? String(localized: "Start recording") : String(localized: "Stop recording"))
     }
 }

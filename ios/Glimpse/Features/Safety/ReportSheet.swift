@@ -34,24 +34,30 @@ struct ReportSheet: View {
     private var form: some View {
         List {
             Section {
-                ForEach(ReportReason.allCases) { option in
-                    Button {
-                        reason = option
-                    } label: {
-                        HStack {
-                            Text(option.label).foregroundStyle(Palette.textPrimary)
-                            Spacer()
-                            if reason == option {
-                                Image(systemName: "checkmark.circle.fill").foregroundStyle(Palette.mint)
-                            }
-                        }
-                    }
-                    .accessibilityAddTraits(reason == option ? .isSelected : [])
-                }
+                EmptyView()
             } header: {
                 Text("What happened?")
             } footer: {
                 Text("\(name) won't know you reported them, and you won't see each other on Glimpse again.")
+            }
+
+            ForEach(ReportReason.menu, id: \.0) { group in
+                Section(group.0.title) {
+                    ForEach(group.1) { option in
+                        Button {
+                            reason = option
+                        } label: {
+                            HStack {
+                                Text(option.label).foregroundStyle(Palette.textPrimary)
+                                Spacer()
+                                if reason == option {
+                                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Palette.mint)
+                                }
+                            }
+                        }
+                        .accessibilityAddTraits(reason == option ? .isSelected : [])
+                    }
+                }
             }
 
             Section("Anything else? (optional)") {
@@ -115,8 +121,8 @@ private struct ReportReceivedView: View {
                     .font(.glimpseTitle2)
                     .foregroundStyle(Palette.textPrimary)
                 Text(reason.isUrgent
-                     ? "Thank you for telling us. We accepted your report and our safety team is dealing with it right now, for your safety and everyone's."
-                     : "Thank you for telling us. We accepted your report and our safety team will look into it, for your safety and everyone's.")
+                     ? String(localized: "Thank you for telling us. We accepted your report and our safety team is dealing with it right now, for your safety and everyone's.")
+                     : String(localized: "Thank you for telling us. We accepted your report and our safety team will look into it, for your safety and everyone's."))
                     .font(.body)
                     .foregroundStyle(Palette.textSecondary)
                     .multilineTextAlignment(.center)

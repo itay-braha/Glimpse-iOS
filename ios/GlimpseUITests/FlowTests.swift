@@ -267,10 +267,18 @@ final class FlowTests: XCTestCase {
         app.buttons["dateIdea.another"].tap()
         pause(1)
         snap("12-2 Another idea")
-        app.buttons["dateIdea.send"].tap()
-        XCTAssertTrue(text(app, containing: "How about").waitForExistence(timeout: 5)
-            || app.textViews.firstMatch.exists, "suggesting it drafts a message")
-        snap("12-3 Suggest it in the chat")
+        // Pick a time there; in the demo they say yes a moment later.
+        app.buttons["dateIdea.plan"].tap()
+        let suggest = app.buttons["datePlan.suggest"]
+        XCTAssertTrue(suggest.waitForExistence(timeout: 5))
+        snap("12-3 Pick a time")
+        suggest.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["plannedDate"].waitForExistence(timeout: 5))
+        XCTAssertTrue(text(app, containing: "Your date with").waitForExistence(timeout: 8), "they accepted")
+        snap("12-4 The date is set")
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["matches.dateChip"].firstMatch.waitForExistence(timeout: 10))
+        snap("12-5 The date shows in Connections")
     }
 
     // Hebrew, right to left: brand names stay in Latin, layout mirrors, swipes stay physical.
@@ -344,7 +352,7 @@ final class FlowTests: XCTestCase {
         let report = app.buttons["Report or block"]
         XCTAssertTrue(report.waitForExistence(timeout: 5))
         report.tap()
-        let harassment = app.buttons["Harassment or threats"]
+        let harassment = app.buttons["Harassing, threatening or creepy"]
         XCTAssertTrue(harassment.waitForExistence(timeout: 5))
         harassment.tap()
         app.buttons["Submit"].tap()

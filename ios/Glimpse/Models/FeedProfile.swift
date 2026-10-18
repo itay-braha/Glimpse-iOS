@@ -12,6 +12,8 @@ struct FeedProfile: Codable, Identifiable, Hashable, Sendable {
     var videos: [ProfileVideo]
     /// Why this card is here when it's outside the viewer's own filters.
     var discoveryNote: DiscoveryNote?
+    /// Showed up to dates with different matches (a positive badge; negatives are never shown).
+    var showsUp: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -23,5 +25,6 @@ struct FeedProfile: Codable, Identifiable, Hashable, Sendable {
         case distanceKm = "distance_km"
         case videos
         case discoveryNote = "discovery_note"
+        case showsUp = "shows_up"
     }
 }

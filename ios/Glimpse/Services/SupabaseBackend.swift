@@ -308,6 +308,8 @@ final class SupabaseBackend: GlimpseBackend {
             case ("GL402", "pin_limit"): throw GlimpseError.pinLimit
             case ("GL402", "gold_required"): throw GlimpseError.goldRequired
             case ("GL402", "idea_limit"): throw GlimpseError.ideaLimit
+            case ("GL402", "date_paused"): throw GlimpseError.datePaused
+            case ("GL402", "date_exists"): throw GlimpseError.dateExists
             case ("GL402", "spotlight_used"): throw GlimpseError.spotlightUsed
             case ("GL402", "rewind_limit"): throw GlimpseError.rewindLimit
             case ("GL402", "city_not_open"): throw GlimpseError.cityNotOpen
@@ -649,6 +651,37 @@ final class SupabaseBackend: GlimpseBackend {
 
     func logDateIdea(_ ideaID: UUID, feedback: DateIdea.Feedback) async {
         _ = try? await client.rpc("log_date_idea", params: ["p_suggestion": ideaID.uuidString, "p_kind": feedback.rawValue]).execute()
+    }
+
+    // MARK: Planned dates
+
+    func plannedDate(matchID: UUID) async throws -> PlannedDate? {
+        let data = try await client.rpc("get_planned_date", params: ["p_match": matchID]).execute().data
+        return try decodeOptional(PlannedDate.self, data)
+    }
+
+    func proposeDate(matchID: UUID, ideaID: UUID, at date: Date) async throws -> PlannedDate {
+        try await mapLimits { () async throws -> PlannedDate in
+            try await client.rpc("propose_date", params: ProposeDateParams(match: matchID, suggestion: ideaID, at: date)).execute().value
+        }
+    }
+
+    func respondDate(_ dateID: UUID, accept: Bool) async throws -> PlannedDate {
+        try await mapLimits { () async throws -> PlannedDate in
+            try await client.rpc("respond_date", params: RespondDateParams(date: dateID, accept: accept)).execute().value
+        }
+    }
+
+    func cancelDate(_ dateID: UUID) async throws {
+        try await client.rpc("cancel_date", params: ["p_date": dateID]).execute()
+    }
+
+    func myPlannedDates() async throws -> [UpcomingDate] {
+        try await client.rpc("my_planned_dates").execute().value
+    }
+
+    func checkInDate(_ dateID: UUID, outcome: DateOutcome) async throws {
+        try await client.rpc("date_checkin", params: ["p_date": dateID.uuidString, "p_outcome": outcome.rawValue]).execute()
     }
 
     /// An RPC answering a JSON object or `null`.
@@ -1036,6 +1069,28 @@ private struct IceServersResponse: Decodable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case iceServers = "ice_servers"
+    }
+}
+
+private struct ProposeDateParams: Encodable, Sendable {
+    let match: UUID
+    let suggestion: UUID
+    let at: Date
+
+    enum CodingKeys: String, CodingKey {
+        case match = "p_match"
+        case suggestion = "p_suggestion"
+        case at = "p_at"
+    }
+}
+
+private struct RespondDateParams: Encodable, Sendable {
+    let date: UUID
+    let accept: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case date = "p_date"
+        case accept = "p_accept"
     }
 }
 

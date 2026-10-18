@@ -12,6 +12,7 @@ struct ChatView: View {
     @State private var showExitSurvey = false
     @State private var showPropose = false
     @State private var showCall = false
+    @State private var showDatePlan = false
     @State private var showVibeInfo = false
     @State private var friendlyFollowUp = false
     @State private var recorder = ChatMediaRecorder()
@@ -97,18 +98,39 @@ struct ChatView: View {
         .background(Palette.midnight)
         .safeAreaInset(edge: .top) {
             VStack(spacing: 0) {
-            if let idea = model.dateIdea, !dismissedDateIdeas.contains(idea.id.uuidString) {
+            if let plan = model.plannedDate, !model.hasEnded {
+                PlannedDateCard(
+                    plan: plan,
+                    name: model.match.displayName,
+                    myID: myID,
+                    onAccept: {
+                        Task {
+                            await model.respondToDate(accept: true, using: app.backend)
+                            app.matchesDidChange()
+                        }
+                    },
+                    onOtherTime: { showDatePlan = true },
+                    onCancel: {
+                        Task {
+                            await model.cancelDate(using: app.backend)
+                            app.matchesDidChange()
+                        }
+                    },
+                    onDirections: { openURL($0) },
+                    onCheckIn: { outcome in
+                        Task { await model.checkIn(outcome, using: app.backend) }
+                        app.track("date_checkin", ["outcome": outcome.rawValue])
+                    }
+                )
+                .background(Palette.midnight)
+            } else if let idea = model.dateIdea, !dismissedDateIdeas.contains(idea.id.uuidString) {
                 DateIdeaCard(
                     idea: idea,
                     onDirections: { url in
                         Task { await app.backend.logDateIdea(idea.id, feedback: .openMaps) }
                         openURL(url)
                     },
-                    onSendToChat: { text in
-                        Task { await app.backend.logDateIdea(idea.id, feedback: .shared) }
-                        model.draft = text
-                        composerFocused = true
-                    },
+                    onPickTime: { showDatePlan = true },
                     onAnother: {
                         Task { await model.anotherDateIdea(using: app.backend) }
                     },
@@ -237,7 +259,13 @@ struct ChatView: View {
             Button("Unmatch", role: .destructive) {
                 Task {
                     try? await app.backend.unmatch(model.match.matchID)
-                    showExitSurvey = true
+                    // Only after a real conversation, and at most once a week.
+                    if model.messages.count >= 3, SurveyPacing.mayAsk() {
+                        SurveyPacing.recordAsked()
+                        showExitSurvey = true
+                    } else {
+                        leave()
+                    }
                 }
             }
         } message: {
@@ -263,6 +291,22 @@ struct ChatView: View {
             }
         }
         .task { await model.refreshDateIdea(using: app.backend) }
+        .sheet(isPresented: $showDatePlan) {
+            DatePlanSheet(
+                place: model.dateIdea?.spot?.name ?? model.dateIdea?.idea ?? model.plannedDate?.place ?? "",
+                name: model.match.displayName
+            ) { when in
+                Task {
+                    if await model.proposeDate(at: when, using: app.backend) {
+                        if let idea = model.dateIdea {
+                            await app.backend.logDateIdea(idea.id, feedback: .shared)
+                        }
+                        app.track("date_proposed")
+                        app.matchesDidChange()
+                    }
+                }
+            }
+        }
         .fullScreenCover(isPresented: $showCall) {
             if let myID {
                 VibeCallView(match: model.match, myID: myID, backend: app.backend) { outcome in

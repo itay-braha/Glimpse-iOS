@@ -97,7 +97,7 @@ struct VibeCallView: View {
                         Text("Connecting…")
                     }
                 } else {
-                    Text(model.meReady ? "Waiting for \(model.match.displayName)…" : "I'm ready")
+                    Text(model.meReady ? String(localized: "Waiting for \(model.match.displayName)…") : String(localized: "I'm ready"))
                         .accessibilityIdentifier("vibe.ready")
                 }
             }
@@ -124,7 +124,7 @@ struct VibeCallView: View {
                 Palette.seededGradient(app.profile?.displayName ?? "You")
                 VStack(spacing: 8) {
                     Image(systemName: "video.fill").font(.largeTitle)
-                    Text(model.isDemo ? "Demo: your camera preview appears here" : "Starting camera…")
+                    Text(model.isDemo ? String(localized: "Demo: your camera preview appears here") : String(localized: "Starting camera…"))
                         .font(.footnote)
                 }
                 .foregroundStyle(.white.opacity(0.8))
@@ -252,8 +252,8 @@ struct VibeCallView: View {
             VStack(spacing: 10) {
                 Image(systemName: "eye.slash.fill").font(.largeTitle)
                 Text(model.localCaptureActive
-                     ? "Video is hidden while your screen is being recorded."
-                     : "\(model.match.displayName)'s screen is being captured. Your video is paused.")
+                     ? String(localized: "Video is hidden while your screen is being recorded.")
+                     : String(localized: "\(model.match.displayName)'s screen is being captured. Your video is paused."))
                     .multilineTextAlignment(.center)
             }
             .foregroundStyle(.white)
@@ -286,7 +286,7 @@ private struct ReadyChip: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(Palette.surfaceRaised, in: .capsule)
-            .accessibilityLabel("\(name) \(ready ? "ready" : "not ready yet")")
+            .accessibilityLabel("\(name) \(ready ? String(localized: "ready") : String(localized: "not ready yet"))")
     }
 }
 
@@ -338,8 +338,8 @@ private struct SafetyNotice: View {
         VStack(alignment: .leading, spacing: 10) {
             Label(
                 isProtected
-                    ? "Screenshots and screen recording are blocked and not allowed in Vibe Checks. They come out black, and an attempt is shown to both of you and noted for our safety team."
-                    : "Screenshots and screen recording are not allowed in Vibe Checks. An attempt pauses your video, is shown to both of you and is noted for our safety team.",
+                    ? String(localized: "Screenshots and screen recording are blocked and not allowed in Vibe Checks. They come out black, and an attempt is shown to both of you and noted for our safety team.")
+                    : String(localized: "Screenshots and screen recording are not allowed in Vibe Checks. An attempt pauses your video, is shown to both of you and is noted for our safety team."),
                 systemImage: "eye.slash.fill"
             )
             .accessibilityIdentifier(isProtected ? "vibe.captureProtected" : "vibe.captureDetected")

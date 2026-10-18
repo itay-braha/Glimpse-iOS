@@ -65,7 +65,7 @@ struct MessageBubble: View {
     @ViewBuilder
     private var content: some View {
         if message.isUnsent {
-            Text(message.deletedAt != nil ? "Message deleted" : "Message unsent")
+            Text(message.deletedAt != nil ? String(localized: "Message deleted") : String(localized: "Message unsent"))
                 .font(.glimpseBody.italic())
                 .foregroundStyle(Palette.textTertiary)
                 .padding(.horizontal, 14)

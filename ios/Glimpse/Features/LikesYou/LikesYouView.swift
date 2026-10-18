@@ -102,7 +102,7 @@ struct LikesYouView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(model.likes.total == 1 ? "1 person wants to see more" : "\(model.likes.total) people want to see more")
+            Text(model.likes.total == 1 ? String(localized: "1 person wants to see more") : String(localized: "\(model.likes.total) people want to see more"))
                 .font(.glimpseTitle2)
             Text("Liking someone back is always free, and it's an instant match.")
                 .font(.subheadline)

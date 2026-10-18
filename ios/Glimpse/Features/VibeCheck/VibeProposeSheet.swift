@@ -38,8 +38,8 @@ struct VibeProposeSheet: View {
                     }
                 } footer: {
                     Text(allowNow
-                         ? "\(name) gets a notification and joins a short lobby with you before the call starts."
-                         : "\(name) confirms the time. Nobody gets an unexpected ring.")
+                         ? String(localized: "\(name) gets a notification and joins a short lobby with you before the call starts.")
+                         : String(localized: "\(name) confirms the time. Nobody gets an unexpected ring."))
                 }
                 Section("Another time") {
                     DatePicker("Time", selection: $custom, in: earliest...Date.now.addingTimeInterval(7 * 86_400))

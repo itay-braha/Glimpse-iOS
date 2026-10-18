@@ -694,6 +694,68 @@ actor DemoBackend: GlimpseBackend {
 
     func logDateIdea(_ ideaID: UUID, feedback: DateIdea.Feedback) {}
 
+    // MARK: Planned dates (demo: the other person accepts a moment later)
+
+    private var plannedDates: [UUID: PlannedDate] = [:]
+
+    func plannedDate(matchID: UUID) -> PlannedDate? {
+        guard var plan = plannedDates[matchID] else { return nil }
+        plan.canCheckIn = plan.status == .confirmed && plan.startsAt < .now && plan.myCheckin == nil
+        return plan.isUpcoming || plan.canCheckIn ? plan : nil
+    }
+
+    func proposeDate(matchID: UUID, ideaID: UUID, at date: Date) throws -> PlannedDate {
+        guard let idea = dateIdeas[matchID]?.first(where: { $0.id == ideaID }) else {
+            throw GlimpseError.message("That idea isn't available any more.")
+        }
+        if let existing = plannedDates[matchID], existing.status == .confirmed, existing.startsAt > .now {
+            throw GlimpseError.dateExists
+        }
+        let plan = PlannedDate(
+            id: UUID(), matchID: matchID, place: idea.spot?.name ?? idea.idea ?? "", startsAt: date,
+            status: .proposed, proposedBy: me, latitude: idea.spot?.latitude, longitude: idea.spot?.longitude,
+            mapsURL: idea.spot?.mapsURL, address: idea.spot?.address, myCheckin: nil, canCheckIn: false
+        )
+        plannedDates[matchID] = plan
+        Task {
+            try? await Task.sleep(for: .milliseconds(1_500))
+            self.demoConfirm(matchID, planID: plan.id)
+        }
+        return plan
+    }
+
+    private func demoConfirm(_ matchID: UUID, planID: UUID) {
+        guard plannedDates[matchID]?.id == planID, plannedDates[matchID]?.status == .proposed else { return }
+        plannedDates[matchID]?.status = .confirmed
+    }
+
+    func respondDate(_ dateID: UUID, accept: Bool) throws -> PlannedDate {
+        guard let key = plannedDates.first(where: { $0.value.id == dateID })?.key, var plan = plannedDates[key] else {
+            throw GlimpseError.message("That plan isn't available any more.")
+        }
+        plan.status = accept ? .confirmed : .declined
+        plannedDates[key] = plan
+        return plan
+    }
+
+    func cancelDate(_ dateID: UUID) {
+        if let key = plannedDates.first(where: { $0.value.id == dateID })?.key {
+            plannedDates[key]?.status = .cancelled
+        }
+    }
+
+    func myPlannedDates() -> [UpcomingDate] {
+        plannedDates.values.filter(\.isUpcoming).map {
+            UpcomingDate(matchID: $0.matchID, startsAt: $0.startsAt, status: $0.status, place: $0.place, proposedBy: $0.proposedBy)
+        }
+    }
+
+    func checkInDate(_ dateID: UUID, outcome: DateOutcome) {
+        if let key = plannedDates.first(where: { $0.value.id == dateID })?.key {
+            plannedDates[key]?.myCheckin = outcome
+        }
+    }
+
     func logVibeCapture(matchID: UUID, kind: String) {}
 
     func setPushScope(_ scope: PushScope) {

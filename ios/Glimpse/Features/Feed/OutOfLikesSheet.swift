@@ -45,7 +45,7 @@ struct OutOfLikesSheet: View {
                     dismiss()
                     onSeeAdmirers()
                 } label: {
-                    Label(admirers == 1 ? "1 person already liked you" : "\(admirers) people already liked you",
+                    Label(admirers == 1 ? String(localized: "1 person already liked you") : String(localized: "\(admirers) people already liked you"),
                           systemImage: "heart.circle.fill")
                 }
                 .buttonStyle(.glimpse)
@@ -87,6 +87,6 @@ struct OutOfLikesSheet: View {
         let seconds = max(Int(date.timeIntervalSince(now)), 0)
         let hours = seconds / 3600
         let minutes = (seconds % 3600) / 60
-        return hours > 0 ? "\(hours)h \(minutes)m" : "\(minutes)m \(seconds % 60)s"
+        return hours > 0 ? String(localized: "\(hours)h \(minutes)m") : String(localized: "\(minutes)m \(seconds % 60)s")
     }
 }

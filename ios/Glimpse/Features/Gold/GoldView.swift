@@ -140,7 +140,7 @@ private struct InsightRow: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text("Clip \(index + 1)").font(.glimpseHeadline)
-                Text(video.isEmbed ? "Linked post" : "Hosted clip")
+                Text(video.isEmbed ? String(localized: "Linked post") : String(localized: "Hosted clip"))
                     .font(.caption)
                     .foregroundStyle(Palette.textTertiary)
                 Spacer()

@@ -58,7 +58,7 @@ struct VerificationView: View {
                         if isLoading {
                             ProgressView().tint(Palette.onMint)
                         } else {
-                            Text(challenge == nil ? "Get my pose" : "Record selfie")
+                            Text(challenge == nil ? String(localized: "Get my pose") : String(localized: "Record selfie"))
                         }
                     }
                     .buttonStyle(.glimpse)

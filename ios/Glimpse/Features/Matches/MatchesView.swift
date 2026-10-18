@@ -100,7 +100,7 @@ struct MatchesView: View {
                         MissedConnectionsView()
                     } label: {
                         Label(
-                            model.missedCount > 0 ? "Missed connections (\(model.missedCount))" : "Missed connections",
+                            model.missedCount > 0 ? String(localized: "Missed connections (\(model.missedCount))") : String(localized: "Missed connections"),
                             systemImage: "clock.arrow.circlepath"
                         )
                     }
@@ -135,7 +135,11 @@ struct MatchesView: View {
                 Button("Unmatch", role: .destructive) {
                     Task {
                         await model.unmatch(match, using: app.backend)
-                        exitSurveyFor = match
+                        // Only after a real conversation, and at most once a week.
+                        if match.messageCount >= 3, SurveyPacing.mayAsk() {
+                            SurveyPacing.recordAsked()
+                            exitSurveyFor = match
+                        }
                         app.matchesDidChange()
                     }
                 }
@@ -181,7 +185,9 @@ struct MatchesView: View {
                 match: match,
                 imageURL: model.avatarURL(for: match),
                 isNextToRelease: model.isNextToRelease(match),
-                isPinned: model.isPinned(match)
+                isPinned: model.isPinned(match),
+                upcomingDate: model.dates[match.matchID],
+                myID: app.profile?.id
             )
         }
         .contextMenu { actions(for: match) }
@@ -277,7 +283,7 @@ private struct LikedYouCard: View {
             }
             .frame(width: 48, height: 48)
             VStack(alignment: .leading, spacing: 2) {
-                Text(count == 1 ? "1 person liked you" : "\(count) people liked you")
+                Text(count == 1 ? String(localized: "1 person liked you") : String(localized: "\(count) people liked you"))
                     .font(.glimpseHeadline)
                     .foregroundStyle(Palette.textPrimary)
                 Text("Like them back and it's an instant match.")
@@ -326,11 +332,11 @@ private struct CapacityHeader: View {
         HStack(spacing: 18) {
             CapacityRing(active: active, cap: cap, diameter: 76, lineWidth: 7)
             VStack(alignment: .leading, spacing: 4) {
-                Text(openSpots == 0 ? "Your circle is full" : "\(openSpots) open \(openSpots == 1 ? "spot" : "spots")")
+                Text(openSpots == 0 ? String(localized: "Your circle is full") : openSpots == 1 ? String(localized: "1 open spot") : String(localized: "\(openSpots) open spots"))
                     .font(.glimpseTitle2)
                 Text(openSpots == 0
-                     ? "Your next match will release your quietest connection. Keep the good ones talking."
-                     : "Glimpse keeps up to \(cap) connections. Quiet ones make room for new ones.")
+                     ? String(localized: "Your next match will release your quietest connection. Keep the good ones talking.")
+                     : String(localized: "Glimpse keeps up to \(cap) connections. Quiet ones make room for new ones."))
                     .font(.subheadline)
                     .foregroundStyle(Palette.textSecondary)
             }
@@ -364,6 +370,8 @@ private struct MatchRow: View {
     let imageURL: URL?
     let isNextToRelease: Bool
     var isPinned = false
+    var upcomingDate: UpcomingDate?
+    var myID: UUID?
 
     private var isQuiet: Bool {
         Date.now.timeIntervalSince(match.lastActivity) > 5 * 86_400
@@ -406,6 +414,9 @@ private struct MatchRow: View {
                         .font(.caption)
                         .foregroundStyle(Palette.textTertiary)
                 }
+                if let date = upcomingDate {
+                    DateChip(date: date, waitingOnMe: date.status == .proposed && date.proposedBy != myID)
+                }
                 HStack {
                     Text(preview)
                         .font(.subheadline)
@@ -444,5 +455,28 @@ private struct Tag: View {
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
             .background(color.opacity(0.15), in: .capsule)
+    }
+}
+
+/// "📅 Thu 19:30 · Lumen Café" on a conversation with a planned date.
+private struct DateChip: View {
+    let date: UpcomingDate
+    let waitingOnMe: Bool
+
+    var body: some View {
+        Label {
+            Text(waitingOnMe
+                 ? String(localized: "Date suggested · \(date.startsAt.formatted(.dateTime.weekday(.abbreviated).hour().minute()))")
+                 : "\(date.startsAt.formatted(.dateTime.weekday(.abbreviated).day().hour().minute())) · \(date.place)")
+                .lineLimit(1)
+        } icon: {
+            Image(systemName: date.status == .confirmed ? "calendar.badge.checkmark" : "calendar.badge.clock")
+        }
+        .font(.caption.weight(.bold))
+        .foregroundStyle(date.status == .confirmed ? Palette.mint : Palette.amber)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background((date.status == .confirmed ? Palette.mint : Palette.amber).opacity(0.15), in: .capsule)
+        .accessibilityIdentifier("matches.dateChip")
     }
 }

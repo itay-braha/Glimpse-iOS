@@ -72,7 +72,7 @@ struct VoiceNoteBubble: View {
             }
             .buttonStyle(.plain)
             .disabled(url == nil)
-            .accessibilityLabel(isPlaying ? "Pause voice message" : "Play voice message")
+            .accessibilityLabel(isPlaying ? String(localized: "Pause voice message") : String(localized: "Play voice message"))
 
             WaveformBar(progress: isPlaying ? playback.progress : 0, seed: message.id.hashValue, tint: isMine ? Palette.onMint : Palette.textPrimary)
                 .frame(width: 120, height: 26)
@@ -160,7 +160,7 @@ struct VideoNoteBubble: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Video message, \(VoiceNoteBubble.format(message.mediaDuration ?? 0))")
-        .accessibilityHint(withSound ? "Tap to mute" : "Tap to play with sound")
+        .accessibilityHint(withSound ? String(localized: "Tap to mute") : String(localized: "Tap to play with sound"))
         .accessibilityIdentifier("bubble.video")
     }
 }

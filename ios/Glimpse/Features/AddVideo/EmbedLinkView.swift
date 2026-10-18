@@ -118,11 +118,11 @@ struct EmbedLinkView: View {
     private func copySteps(for platform: EmbedLink.Platform) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             InstructionRow(index: "a", text: platform == .instagram
-                ? "Open the Reel or post in Instagram."
-                : "Open the video in TikTok.")
+                ? String(localized: "Open the Reel or post in Instagram.")
+                : String(localized: "Open the video in TikTok."))
             InstructionRow(index: "b", text: platform == .instagram
-                ? "Tap the paper plane (Share) under it."
-                : "Tap the arrow (Share) on the right.")
+                ? String(localized: "Tap the paper plane (Share) under it.")
+                : String(localized: "Tap the arrow (Share) on the right."))
             InstructionRow(index: "c", text: "Tap \"Copy link\", then come back here.")
             Button {
                 openURL(platform == .instagram ? URL(string: "https://www.instagram.com/")! : URL(string: "https://www.tiktok.com/")!)

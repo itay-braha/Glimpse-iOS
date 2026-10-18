@@ -367,13 +367,22 @@ struct FeedCardView: View {
                 }
             }
             .lineLimit(1)
+            if profile.showsUp == true {
+                Label("Shows up", systemImage: "calendar.badge.checkmark")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Palette.onMint)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Palette.mint, in: .capsule)
+                    .accessibilityLabel("Shows up to dates")
+            }
             .minimumScaleFactor(0.7)
             HStack(spacing: 12) {
                 if let city = profile.city {
                     Label(city, systemImage: "location.fill")
                 }
                 if let km = profile.distanceKm {
-                    Text(km <= 1 ? "Under 1 km away" : "\(km) km away")
+                    Text(km <= 1 ? String(localized: "Under 1 km away") : String(localized: "\(km) km away"))
                 }
             }
             .font(.subheadline.weight(.semibold))

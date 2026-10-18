@@ -14,6 +14,8 @@ final class ChatModel {
     private(set) var vibe: VibeCheckState?
     /// A first-date idea, once a Vibe Check went well.
     private(set) var dateIdea: DateIdea?
+    /// A date the two of them are planning, or had (until the private check-in).
+    private(set) var plannedDate: PlannedDate?
     private(set) var isFrozen: Bool
     var draft = ""
     /// The message being answered (swipe a bubble, or "Reply" in its menu).
@@ -204,6 +206,41 @@ final class ChatModel {
     func refreshDateIdea(using backend: any GlimpseBackend) async {
         guard !hasEnded else { return }
         dateIdea = (try? await backend.dateIdea(matchID: match.matchID)) ?? dateIdea
+        plannedDate = try? await backend.plannedDate(matchID: match.matchID)
+    }
+
+    /// Picks a time at the current idea's place; the other person accepts or suggests another.
+    func proposeDate(at date: Date, using backend: any GlimpseBackend) async -> Bool {
+        guard let idea = dateIdea else { return false }
+        do {
+            plannedDate = try await backend.proposeDate(matchID: match.matchID, ideaID: idea.id, at: date)
+            return true
+        } catch {
+            errorMessage = GlimpseError.describe(error)
+            return false
+        }
+    }
+
+    func respondToDate(accept: Bool, using backend: any GlimpseBackend) async {
+        guard let plan = plannedDate else { return }
+        do {
+            plannedDate = try await backend.respondDate(plan.id, accept: accept)
+            if !accept { plannedDate = nil }
+        } catch {
+            errorMessage = GlimpseError.describe(error)
+        }
+    }
+
+    func cancelDate(using backend: any GlimpseBackend) async {
+        guard let plan = plannedDate else { return }
+        try? await backend.cancelDate(plan.id)
+        plannedDate = nil
+    }
+
+    func checkIn(_ outcome: DateOutcome, using backend: any GlimpseBackend) async {
+        guard let plan = plannedDate else { return }
+        try? await backend.checkInDate(plan.id, outcome: outcome)
+        plannedDate = nil
     }
 
     func anotherDateIdea(using backend: any GlimpseBackend) async {

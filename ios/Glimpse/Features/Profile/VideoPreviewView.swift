@@ -104,7 +104,7 @@ struct VideoPreviewView: View {
             RecencyBadge(video: video)
             HStack(spacing: 10) {
                 if !video.isEmbed {
-                    Button(marker == nil ? "Tag me" : "Move tag", systemImage: "person.crop.circle.badge.checkmark") {
+                    Button(marker == nil ? String(localized: "Tag me") : String(localized: "Move tag"), systemImage: "person.crop.circle.badge.checkmark") {
                         isTagging = true
                     }
                 }

@@ -147,7 +147,7 @@ private struct RotationPrompt: View {
                 .font(.title2)
                 .foregroundStyle(Palette.pink)
             VStack(alignment: .leading, spacing: 6) {
-                Text(count == 1 ? "1 moment is over a year old" : "\(count) moments are over a year old")
+                Text(count == 1 ? String(localized: "1 moment is over a year old") : String(localized: "\(count) moments are over a year old"))
                     .font(.glimpseHeadline)
                 Text("Fresh clips keep your profile honest and get you seen more.")
                     .font(.subheadline)
@@ -226,7 +226,7 @@ private struct VideoTile: View {
                     .strokeBorder(needsAttention ? Palette.pink : Palette.stroke, lineWidth: needsAttention ? 2 : 1)
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("\(video.isEmbed ? "\(video.source.displayName) link" : video.source.displayName) moment, \(Recency.label(for: video))\(video.isUnavailable ? ", no longer available, hidden from others" : isStale ? ", needs rotating" : "")")
+            .accessibilityLabel("\(video.isEmbed ? "\(video.source.displayName) link" : video.source.displayName) moment, \(Recency.label(for: video))\(video.isUnavailable ? ", no longer available, hidden from others" : isStale ? String(localized: ", needs rotating") : String(localized: ""))")
     }
 }
 
