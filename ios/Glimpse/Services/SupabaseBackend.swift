@@ -373,8 +373,40 @@ final class SupabaseBackend: GlimpseBackend {
         try await client.rpc("react_to_message", params: ReactParams(message: messageID, emoji: emoji)).execute()
     }
 
-    func unsend(_ messageID: UUID) async throws {
-        try await client.rpc("unsend_message", params: ["p_message": messageID.uuidString]).execute()
+    func deleteMessage(_ messageID: UUID) async throws {
+        try await client.rpc("delete_message", params: ["p_message": messageID.uuidString]).execute()
+    }
+
+    func sendMedia(_ kind: MessageKind, fileURL: URL, duration: Double, matchID: UUID, replyTo: UUID?) async throws -> ChatMessage {
+        let bytes = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? nil
+        let path = try await upload(
+            fileURL: fileURL, kind: "chat", ext: kind == .voice ? "m4a" : "mp4", bytes: bytes, limit: 15 * 1024 * 1024
+        )
+        let row = NewMediaMessageRow(
+            matchID: matchID, senderID: try currentUserID(), kind: kind.rawValue, mediaPath: path,
+            mediaDuration: (min(duration, kind.maxDuration) * 10).rounded() / 10, replyTo: replyTo
+        )
+        return try await mapLimits {
+            try await client.from("messages").insert(row).select().single().execute().value
+        }
+    }
+
+    func chatMediaURLs(for paths: [String]) async -> [String: URL] {
+        let unique = Array(Set(paths))
+        var resolved = await signedURLs.lookup(unique)
+        let missing = unique.filter { resolved[$0] == nil }
+        guard !missing.isEmpty else { return resolved }
+        guard let response: MediaURLsResponse = try? await client.functions.invoke(
+            "media",
+            options: FunctionInvokeOptions(body: ChatMediaRequest(paths: missing))
+        ) else { return resolved }
+        var fresh: [String: URL] = [:]
+        for (path, string) in response.urls {
+            if let url = URL(string: string) { fresh[path] = url }
+        }
+        await signedURLs.store(fresh, validFor: 3000)
+        resolved.merge(fresh) { current, _ in current }
+        return resolved
     }
 
     func setPushScope(_ scope: PushScope) async throws {
@@ -902,6 +934,33 @@ private struct VibeRecordingParams: Encodable, Sendable {
         case path = "p_path"
         case startedAt = "p_started_at"
     }
+}
+
+private struct NewMediaMessageRow: Encodable, Sendable {
+    let matchID: UUID
+    let senderID: UUID
+    /// Replaced by the server ("🎤 Voice message" / "🎥 Video message").
+    let body = "media"
+    let kind: String
+    let mediaPath: String
+    let mediaDuration: Double
+    let replyTo: UUID?
+
+    enum CodingKeys: String, CodingKey {
+        case matchID = "match_id"
+        case senderID = "sender_id"
+        case body
+        case kind
+        case mediaPath = "media_path"
+        case mediaDuration = "media_duration"
+        case replyTo = "reply_to"
+    }
+}
+
+private struct ChatMediaRequest: Encodable, Sendable {
+    let action = "view_urls"
+    let kind = "chat"
+    let paths: [String]
 }
 
 /// Sends `p_emoji: null` explicitly to remove a reaction.

@@ -437,4 +437,43 @@ final class FlowTests: XCTestCase {
         }
         XCTAssertTrue(waitUntilGone(turnOn, timeout: 5))
     }
+
+    // Hold to record, slide up to lock, trash or send; delete for everyone.
+    func testVoiceVideoAndDelete() {
+        let app = launch("chat")
+        let voice = app.buttons["chat.recordVoice"]
+        XCTAssertTrue(voice.waitForExistence(timeout: 20))
+        snap("10-1 Mic and camera beside the message field")
+
+        // Video note: hold, then slide left to cancel. Nothing is sent.
+        let video = app.buttons["chat.recordVideo"]
+        let videosBefore = app.descendants(matching: .any).matching(identifier: "bubble.video").count
+        video.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 1.5, thenDragTo: app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.93)))
+        pause(1)
+        XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "bubble.video").count, videosBefore)
+        snap("10-2 Slid left: video cancelled")
+
+        // Voice: hold, slide up to lock, then send hands-free.
+        let above = voice.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: -3))
+        voice.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 1.0, thenDragTo: above)
+        let trash = app.buttons["chat.recordTrash"]
+        XCTAssertTrue(trash.waitForExistence(timeout: 5))
+        pause(1.5)
+        snap("10-3 Locked: recording hands-free")
+        app.buttons["chat.send"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["bubble.voice"].waitForExistence(timeout: 15))
+        pause(1)
+        snap("10-4 Voice message sent")
+
+        // Delete for everyone: the chat shows it as deleted.
+        let mine = app.descendants(matching: .any).matching(identifier: "bubble.mine").allElementsBoundByIndex.last!
+        mine.press(forDuration: 1.2)
+        let delete = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'Delete for everyone'")).firstMatch
+        XCTAssertTrue(delete.waitForExistence(timeout: 5))
+        snap("10-5 Hold: delete for everyone")
+        delete.tap()
+        XCTAssertTrue(text(app, containing: "Message deleted").waitForExistence(timeout: 5))
+        snap("10-6 Deleted (kept privately for the safety team)")
+    }
 }

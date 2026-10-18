@@ -521,18 +521,40 @@ actor DemoBackend: GlimpseBackend {
         reactions[messageID, default: [:]][me] = emoji
     }
 
-    func unsend(_ messageID: UUID) throws {
+    /// Kept like the server's evidence archive, so tests can check deleting doesn't erase.
+    private(set) var deletedArchive: [UUID: ChatMessage] = [:]
+
+    func deleteMessage(_ messageID: UUID) throws {
         for (matchID, list) in messages {
             guard let index = list.firstIndex(where: { $0.id == messageID }) else { continue }
             let message = list[index]
-            guard message.senderID == me, !message.isUnsent,
-                  Date.now.timeIntervalSince(message.createdAt) < 15 * 60
-            else { throw GlimpseError.message("You can unsend your own messages for 15 minutes.") }
-            messages[matchID]?[index].unsentAt = .now
-            messages[matchID]?[index].body = "Message unsent"
+            guard message.senderID == me, !message.isUnsent
+            else { throw GlimpseError.message("You can delete your own messages.") }
+            deletedArchive[messageID] = message
+            messages[matchID]?[index].deletedAt = .now
+            messages[matchID]?[index].body = "Message deleted"
+            messages[matchID]?[index].mediaPath = nil
             reactions[messageID] = nil
             return
         }
+    }
+
+    func sendMedia(_ kind: MessageKind, fileURL: URL, duration: Double, matchID: UUID, replyTo: UUID?) -> ChatMessage {
+        var message = ChatMessage(
+            id: UUID(), matchID: matchID, senderID: me,
+            body: kind == .voice ? "🎤 Voice message" : "🎥 Video message", createdAt: .now, readAt: nil
+        )
+        message.kind = kind
+        message.mediaPath = fileURL.absoluteString
+        message.mediaDuration = min(duration, kind.maxDuration)
+        message.replyTo = replyTo
+        record(message)
+        Task { await self.simulateReply(in: matchID, to: message) }
+        return message
+    }
+
+    func chatMediaURLs(for paths: [String]) -> [String: URL] {
+        mediaURLs(for: paths)
     }
 
     /// Demo calls have no camera, so there's nothing to keep.

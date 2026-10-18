@@ -252,6 +252,8 @@ final class AppModel {
             "This account was closed for violating our community rules."
         case "underage_review":
             "Your account is paused while we review it. We'll be in touch soon."
+        case "safety_review":
+            "Your account is on hold while our safety team reviews a report about a conversation. We'll let you know the outcome."
         default:
             "We couldn't verify this device."
         }

@@ -3,9 +3,10 @@ import UIKit
 
 /// One message, with everything a modern chat expects:
 ///   * swipe right to reply (the quote shows above the reply);
-///   * double-tap for ❤️; long-press for the reaction palette, Reply, Copy, Unsend;
+///   * double-tap for ❤️; long-press for the reaction palette, Reply, Copy, Delete;
+///   * voice messages and round video notes play in place;
 ///   * reaction chips under the bubble (tap yours to remove it);
-///   * unsent messages read "Message unsent".
+///   * deleted messages read "Message deleted".
 struct MessageBubble: View {
     let message: ChatMessage
     let isMine: Bool
@@ -16,10 +17,12 @@ struct MessageBubble: View {
     /// userID → emoji on this message.
     var reactions: [UUID: String] = [:]
     var myID: UUID?
-    var canUnsend = false
+    var canDelete = false
+    /// The recording's playable link, for voice and video messages.
+    var mediaURL: URL?
     var onReact: (String) -> Void = { _ in }
     var onReply: () -> Void = {}
-    var onUnsend: () -> Void = {}
+    var onDelete: () -> Void = {}
     var onTapQuote: () -> Void = {}
 
     @State private var dragX: CGFloat = 0
@@ -59,12 +62,32 @@ struct MessageBubble: View {
         .padding(.bottom, showsTail ? 6 : 0)
     }
 
+    @ViewBuilder
+    private var content: some View {
+        if message.isUnsent {
+            Text(message.deletedAt != nil ? "Message deleted" : "Message unsent")
+                .font(.glimpseBody.italic())
+                .foregroundStyle(Palette.textTertiary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+        } else {
+            switch message.resolvedKind {
+            case .text:
+                Text(message.body)
+                    .font(.glimpseBody)
+                    .foregroundStyle(isMine ? Palette.onMint : Palette.textPrimary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+            case .voice:
+                VoiceNoteBubble(message: message, url: mediaURL, isMine: isMine)
+            case .video:
+                VideoNoteBubble(message: message, url: mediaURL)
+            }
+        }
+    }
+
     private var bubble: some View {
-        Text(message.isUnsent ? "Message unsent" : message.body)
-            .font(message.isUnsent ? .glimpseBody.italic() : .glimpseBody)
-            .foregroundStyle(message.isUnsent ? Palette.textTertiary : (isMine ? Palette.onMint : Palette.textPrimary))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+        content
             .background(background, in: shape)
             .overlay {
                 if message.isUnsent {
@@ -90,18 +113,20 @@ struct MessageBubble: View {
                     }
                     .controlGroupStyle(.palette)
                     Button("Reply", systemImage: "arrowshape.turn.up.left", action: onReply)
-                    Button("Copy", systemImage: "doc.on.doc") {
-                        UIPasteboard.general.string = message.body
+                    if message.resolvedKind == .text {
+                        Button("Copy", systemImage: "doc.on.doc") {
+                            UIPasteboard.general.string = message.body
+                        }
                     }
-                    if canUnsend {
-                        Button("Unsend", systemImage: "arrow.uturn.backward", role: .destructive, action: onUnsend)
+                    if canDelete {
+                        Button("Delete for everyone", systemImage: "trash", role: .destructive, action: onDelete)
                     }
                 }
             }
     }
 
     private var background: Color {
-        if message.isUnsent { return .clear }
+        if message.isUnsent || message.resolvedKind == .video { return .clear }
         return isMine ? Palette.mint : Palette.surfaceRaised
     }
 

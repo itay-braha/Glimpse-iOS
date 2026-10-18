@@ -65,8 +65,8 @@ targets:
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         ITSAppUsesNonExemptEncryption: false
-        NSCameraUsageDescription: Glimpse uses the camera to record your 15-second profile moments.
-        NSMicrophoneUsageDescription: Glimpse records sound with your profile moments so people hear the real you.
+        NSCameraUsageDescription: Glimpse uses the camera for your profile moments, video messages in chat and Vibe Check calls.
+        NSMicrophoneUsageDescription: Glimpse uses the microphone for your profile moments, voice and video messages, and Vibe Check calls.
         NSLocationWhenInUseUsageDescription: Glimpse uses your approximate location to show people nearby and how far away they are. Your exact location is never shared.
         NSLocationDefaultAccuracyReduced: true
         CFBundleURLTypes:

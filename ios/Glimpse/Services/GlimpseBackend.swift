@@ -71,8 +71,12 @@ protocol GlimpseBackend: AnyObject, Sendable {
     func fetchReactions(matchID: UUID) async throws -> [MessageReaction]
     /// One reaction per person per message; nil removes yours.
     func react(to messageID: UUID, emoji: String?) async throws
-    /// Your own message, within 15 minutes.
-    func unsend(_ messageID: UUID) async throws
+    /// Deletes one of your own messages for everyone (the safety team keeps a copy for 30 days).
+    func deleteMessage(_ messageID: UUID) async throws
+    /// Sends a voice message or video note recorded in the chat.
+    func sendMedia(_ kind: MessageKind, fileURL: URL, duration: Double, matchID: UUID, replyTo: UUID?) async throws -> ChatMessage
+    /// Playable links for chat recordings (only the two people in the conversation get them).
+    func chatMediaURLs(for paths: [String]) async -> [String: URL]
     func markRead(matchID: UUID) async throws
     func openChannel(matchID: UUID) async -> ChatChannel
 

@@ -5,6 +5,15 @@ import Foundation
 enum DemoData {
     static let meID = UUID(uuidString: "00000000-0000-4000-8000-000000000000")!
 
+    /// What a demo build sends when the simulator has no camera or microphone.
+    static func chatSample(_ kind: MessageKind) -> URL? {
+        switch kind {
+        case .voice: URL(string: "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3")
+        case .video: URL(string: clipURLs[2])
+        case .text: nil
+        }
+    }
+
     static let clipURLs = [
         "https://test-videos.co.uk/vids/jellyfish/mp4/h264/720/Jellyfish_720_10s_1MB.mp4",
         "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",

@@ -4,9 +4,6 @@ import Observation
 @MainActor
 @Observable
 final class ChatModel {
-    /// Your own messages can be unsent for this long.
-    static let unsendWindow: TimeInterval = 15 * 60
-
     let match: MatchSummary
     private(set) var messages: [ChatMessage] = []
     /// messageID → (userID → emoji). One reaction per person per message.
@@ -19,6 +16,9 @@ final class ChatModel {
     var draft = ""
     /// The message being answered (swipe a bubble, or "Reply" in its menu).
     var replyingTo: ChatMessage?
+    /// Playable links for voice messages and video notes, by storage path.
+    private(set) var mediaURLs: [String: URL] = [:]
+    private(set) var isSendingMedia = false
     var errorMessage: String?
 
     private var channel: ChatChannel?
@@ -39,6 +39,7 @@ final class ChatModel {
         hasEnded = !(await isStillActive(using: backend))
         do {
             messages = try await backend.fetchMessages(matchID: match.matchID)
+            await resolveMedia(for: messages, using: backend)
             for reaction in (try? await backend.fetchReactions(matchID: match.matchID)) ?? [] {
                 apply(reaction)
             }
@@ -55,6 +56,7 @@ final class ChatModel {
         let messageTask = Task {
             for await message in channel.messages {
                 receive(message, myID: myID, backend: backend)
+                await resolveMedia(for: [message], using: backend)
             }
         }
         let updateTask = Task {
@@ -116,7 +118,41 @@ final class ChatModel {
         }
     }
 
-    // MARK: Replies, reactions, unsend
+    // MARK: Voice messages and video notes
+
+    func sendMedia(_ recording: ChatMediaRecorder.Recording, using backend: any GlimpseBackend) async {
+        guard !hasEnded else { return }
+        let quoting = replyingTo
+        replyingTo = nil
+        isSendingMedia = true
+        defer { isSendingMedia = false }
+        do {
+            let message = try await backend.sendMedia(
+                recording.kind, fileURL: recording.fileURL, duration: recording.duration,
+                matchID: match.matchID, replyTo: quoting?.id
+            )
+            if let path = message.mediaPath, recording.fileURL.isFileURL {
+                mediaURLs[path] = recording.fileURL // play our own copy straight away
+            }
+            await resolveMedia(for: [message], using: backend)
+            insert(message)
+        } catch {
+            replyingTo = quoting
+            errorMessage = GlimpseError.describe(error)
+        }
+    }
+
+    func mediaURL(for message: ChatMessage) -> URL? {
+        message.mediaPath.flatMap { mediaURLs[$0] }
+    }
+
+    private func resolveMedia(for batch: [ChatMessage], using backend: any GlimpseBackend) async {
+        let paths = batch.compactMap(\.mediaPath).filter { mediaURLs[$0] == nil }
+        guard !paths.isEmpty else { return }
+        mediaURLs.merge(await backend.chatMediaURLs(for: paths)) { current, _ in current }
+    }
+
+    // MARK: Replies, reactions, deleting
 
     func message(withID id: UUID?) -> ChatMessage? {
         guard let id else { return nil }
@@ -141,18 +177,19 @@ final class ChatModel {
         }
     }
 
-    func canUnsend(_ message: ChatMessage, myID: UUID?) -> Bool {
+    /// Your own messages, any time (the safety team keeps a copy for 30 days).
+    func canDelete(_ message: ChatMessage, myID: UUID?) -> Bool {
         message.senderID == myID && !message.isUnsent && !hasEnded
-            && Date.now.timeIntervalSince(message.createdAt) < Self.unsendWindow
     }
 
-    func unsend(_ message: ChatMessage, using backend: any GlimpseBackend) async {
+    func delete(_ message: ChatMessage, using backend: any GlimpseBackend) async {
         do {
-            try await backend.unsend(message.id)
-            var unsent = message
-            unsent.unsentAt = .now
-            unsent.body = "Message unsent"
-            replace(unsent)
+            try await backend.deleteMessage(message.id)
+            var deleted = message
+            deleted.deletedAt = .now
+            deleted.body = "Message deleted"
+            deleted.mediaPath = nil
+            replace(deleted)
             reactions[message.id] = nil
             if replyingTo?.id == message.id { replyingTo = nil }
         } catch {

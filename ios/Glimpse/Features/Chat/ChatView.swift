@@ -11,6 +11,7 @@ struct ChatView: View {
     @State private var showCall = false
     @State private var showVibeInfo = false
     @State private var friendlyFollowUp = false
+    @State private var recorder = ChatMediaRecorder()
     @FocusState private var composerFocused: Bool
 
     let onConnectionChanged: () -> Void
@@ -45,12 +46,13 @@ struct ChatView: View {
                             quotedAuthor: author(of: model.message(withID: message.replyTo)),
                             reactions: model.reactions(on: message),
                             myID: myID,
-                            canUnsend: model.canUnsend(message, myID: myID),
+                            canDelete: model.canDelete(message, myID: myID),
+                            mediaURL: model.mediaURL(for: message),
                             onReact: { emoji in
                                 Task { await model.react(to: message, with: emoji, myID: myID, using: app.backend) }
                             },
                             onReply: { startReply(to: message) },
-                            onUnsend: { Task { await model.unsend(message, using: app.backend) } },
+                            onDelete: { Task { await model.delete(message, using: app.backend) } },
                             onTapQuote: {
                                 if let quoted = message.replyTo {
                                     withAnimation(.snappy) { proxy.scrollTo(quoted, anchor: .center) }
@@ -176,6 +178,21 @@ struct ChatView: View {
             }
         }
         .toolbar(.hidden, for: .tabBar)
+        .overlay(alignment: .bottom) {
+            if recorder.isRecording, recorder.kind == .video {
+                VideoNotePreview(recorder: recorder)
+                    .padding(.bottom, 120)
+                    .transition(.scale.combined(with: .opacity))
+                    .allowsHitTesting(false)
+            }
+        }
+        .animation(.snappy, value: recorder.isRecording)
+        .onChange(of: recorder.reachedCap) { _, reached in
+            guard reached else { return }
+            Task { if let recording = await recorder.finish() { await sendRecording(recording) } }
+        }
+        .onDisappear { recorder.teardown() }
+        .task { recorder.demoFallback = app.isDemo }
         .task { await model.run(using: app.backend, myID: myID) }
         .sheet(isPresented: $showReport) {
             ReportSheet(name: model.match.displayName) { reason, details in
@@ -283,34 +300,68 @@ struct ChatView: View {
                 .accessibilityIdentifier("chat.replyBar")
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-            HStack(alignment: .bottom, spacing: 10) {
-                TextField("Message \(model.match.displayName)", text: $model.draft, axis: .vertical)
-                    .lineLimit(1...5)
-                    .focused($composerFocused)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(Palette.surfaceRaised, in: .rect(cornerRadius: 22))
-                    .onChange(of: model.draft) { model.draftChanged() }
-                    .disabled(model.hasEnded)
+            if let hint = recorder.errorMessage, !recorder.isRecording {
+                Text(hint)
+                    .font(.caption)
+                    .foregroundStyle(Palette.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .task(id: hint) {
+                        try? await Task.sleep(for: .seconds(3))
+                        recorder.errorMessage = nil
+                    }
+            }
+            HStack(alignment: .bottom, spacing: 8) {
+                if recorder.isRecording {
+                    ChatRecordingBar(recorder: recorder)
+                } else {
+                    TextField("Message \(model.match.displayName)", text: $model.draft, axis: .vertical)
+                        .lineLimit(1...5)
+                        .focused($composerFocused)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(Palette.surfaceRaised, in: .rect(cornerRadius: 22))
+                        .onChange(of: model.draft) { model.draftChanged() }
+                        .disabled(model.hasEnded)
+                }
 
-                Button("Send", systemImage: "arrow.up") {
-                    Task {
-                        await model.send(using: app.backend)
-                        app.track("message_sent")
+                if recorder.phase == .locked || model.canSend {
+                    Button("Send", systemImage: "arrow.up") {
+                        Task {
+                            if recorder.phase == .locked {
+                                if let recording = await recorder.finish() { await sendRecording(recording) }
+                            } else {
+                                await model.send(using: app.backend)
+                                app.track("message_sent")
+                            }
+                        }
+                    }
+                    .labelStyle(.iconOnly)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Palette.onMint)
+                    .frame(width: 44, height: 44)
+                    .background(Palette.mint, in: .circle)
+                    .accessibilityIdentifier("chat.send")
+                } else {
+                    // Hold to record (WhatsApp-style): selfie video note, or voice.
+                    ChatRecordButton(kind: .video, recorder: recorder) { recording in
+                        Task { await sendRecording(recording) }
+                    }
+                    ChatRecordButton(kind: .voice, recorder: recorder) { recording in
+                        Task { await sendRecording(recording) }
                     }
                 }
-                .labelStyle(.iconOnly)
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(Palette.onMint)
-                .frame(width: 44, height: 44)
-                .background(model.canSend ? Palette.mint : Palette.surfaceRaised, in: .circle)
-                .disabled(!model.canSend)
             }
+            .disabled(model.isSendingMedia)
         }
         .padding(.horizontal, 12)
         .padding(.top, 8)
         .padding(.bottom, 8)
         .background(Palette.midnight.opacity(0.96))
+    }
+
+    private func sendRecording(_ recording: ChatMediaRecorder.Recording) async {
+        await model.sendMedia(recording, using: app.backend)
+        app.track(recording.kind == .voice ? "voice_message_sent" : "video_message_sent")
     }
 
     /// My most recent message the other person has read ("Seen" goes under it).
