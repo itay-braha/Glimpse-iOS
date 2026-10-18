@@ -2,7 +2,7 @@ import Foundation
 import Supabase
 
 /// Production backend. All match-graph mutations go through Postgres RPCs so the
-/// 20-match cap and auto-boot run inside one locked transaction on the server.
+/// 15-match cap and auto-boot run inside one locked transaction on the server.
 final class SupabaseBackend: GlimpseBackend {
     let isDemo = false
     let config: AppConfig
@@ -251,15 +251,6 @@ final class SupabaseBackend: GlimpseBackend {
         try await client.rpc("get_likes_received").execute().value
     }
 
-    func revealLike() async throws -> FeedProfile? {
-        try await mapLimits {
-            let response = try await client.rpc("reveal_like").execute()
-            let text = String(decoding: response.data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !text.isEmpty, text != "null" else { return nil }
-            return try JSONDecoder.glimpse().decode(FeedProfile.self, from: response.data)
-        }
-    }
-
     func verifyPurchase(signedTransaction: String) async throws -> Bool {
         let response: PurchaseResponse = try await client.functions.invoke(
             "verify-purchase",
@@ -274,9 +265,9 @@ final class SupabaseBackend: GlimpseBackend {
             return try await work()
         } catch let error as PostgrestError {
             switch (error.code, error.message) {
-            case ("GL402", "reveal_limit"): throw GlimpseError.revealLimit
             case ("GL402", "daily_view_limit"): throw GlimpseError.outOfViews
             case ("GL402", "freeze_limit"): throw GlimpseError.freezeLimit
+            case ("GL402", "pin_limit"): throw GlimpseError.pinLimit
             case ("GL402", "plus_required"): throw GlimpseError.plusRequired
             case ("GL402", "second_chance_limit"): throw GlimpseError.secondChanceLimit
             case ("GL402", _): throw GlimpseError.outOfLikes
@@ -297,6 +288,17 @@ final class SupabaseBackend: GlimpseBackend {
         try await mapLimits {
             try await client.rpc("set_frozen", params: FreezeParams(match: matchID, frozen: frozen)).execute()
         }
+    }
+
+    func setPinned(_ matchID: UUID, pinned: Bool) async throws {
+        try await mapLimits {
+            try await client.rpc("set_pinned", params: PinParams(match: matchID, pinned: pinned)).execute()
+        }
+    }
+
+    func pinnedMatchIDs() async throws -> Set<UUID> {
+        let ids: [UUID] = try await client.rpc("my_pinned_matches").execute().value
+        return Set(ids)
     }
 
     func submitExitFeedback(matchID: UUID, reason: ExitReason) async throws {
@@ -412,6 +414,20 @@ final class SupabaseBackend: GlimpseBackend {
     func setPushScope(_ scope: PushScope) async throws {
         try await client.from("profiles")
             .update(["push_scope": scope.rawValue])
+            .eq("id", value: currentUserKey())
+            .execute()
+    }
+
+    func setPushExtras(_ extras: [AlertExtra]) async throws {
+        try await client.from("profiles")
+            .update(["push_extras": extras.map(\.rawValue)])
+            .eq("id", value: currentUserKey())
+            .execute()
+    }
+
+    func setDataConsent(aiTraining: Bool, sharing: Bool) async throws {
+        try await client.from("profiles")
+            .update(["consent_ai_training": aiTraining, "consent_data_sharing": sharing])
             .eq("id", value: currentUserKey())
             .execute()
     }
@@ -532,13 +548,21 @@ final class SupabaseBackend: GlimpseBackend {
 
     // MARK: 3-Minute Vibe Check
 
-    func uploadVibeRecording(matchID: UUID, fileURL: URL, startedAt: Date) async throws {
+    func uploadVibeSegment(
+        matchID: UUID, fileURL: URL, startedAt: Date, part: Int, duration: Double?, received: Bool
+    ) async throws {
         let bytes = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? nil
         let path = try await upload(fileURL: fileURL, kind: "vibe", ext: "mp4", bytes: bytes, limit: 40 * 1024 * 1024)
         try await client.rpc(
-            "vibe_register_recording",
-            params: VibeRecordingParams(match: matchID, path: path, startedAt: startedAt)
+            "vibe_register_segment",
+            params: VibeSegmentParams(
+                match: matchID, path: path, startedAt: startedAt, part: part, duration: duration, received: received
+            )
         ).execute()
+    }
+
+    func vibeBackupDecision(matchID: UUID) async throws -> VibeBackupDecision {
+        try await client.rpc("vibe_backup_decision", params: ["p_match": matchID]).execute().value
     }
 
     func logVibeCapture(matchID: UUID, kind: String) async {
@@ -782,6 +806,16 @@ private struct MediaURLsResponse: Decodable, Sendable {
     let urls: [String: String]
 }
 
+private struct PinParams: Encodable, Sendable {
+    let match: UUID
+    let pinned: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case match = "p_match"
+        case pinned = "p_pinned"
+    }
+}
+
 private struct FreezeParams: Encodable, Sendable {
     let match: UUID
     let frozen: Bool
@@ -924,15 +958,21 @@ private struct FeedEventsParams: Encodable, Sendable {
     }
 }
 
-private struct VibeRecordingParams: Encodable, Sendable {
+private struct VibeSegmentParams: Encodable, Sendable {
     let match: UUID
     let path: String
     let startedAt: Date
+    let part: Int
+    let duration: Double?
+    let received: Bool
 
     enum CodingKeys: String, CodingKey {
         case match = "p_match"
         case path = "p_path"
         case startedAt = "p_started_at"
+        case part = "p_part"
+        case duration = "p_duration"
+        case received = "p_received"
     }
 }
 

@@ -317,7 +317,7 @@ private struct SafetyNotice: View {
             )
             .accessibilityIdentifier(isProtected ? "vibe.captureProtected" : "vibe.captureDetected")
             Label(
-                "For safety, each phone keeps a private recording of its own camera and mic for 30 days. Nobody watches it unless one of you reports this call, and then only Glimpse's safety team.",
+                "For safety, the call is recorded privately and stored by Glimpse for 30 days, even if someone deletes the app. Nobody watches it unless one of you reports this call, and then only Glimpse's safety team.",
                 systemImage: "lock.shield.fill"
             )
             Toggle("I agree", isOn: $agreed)

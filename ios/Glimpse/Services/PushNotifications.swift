@@ -23,6 +23,19 @@ final class PushNotifications: NSObject, UNUserNotificationCenterDelegate {
         await UNUserNotificationCenter.current().notificationSettings().authorizationStatus == .notDetermined
     }
 
+    /// Whether iOS currently lets Glimpse show alerts at all.
+    func isAuthorized() async -> Bool {
+        switch await UNUserNotificationCenter.current().notificationSettings().authorizationStatus {
+        case .authorized, .provisional, .ephemeral: true
+        default: false
+        }
+    }
+
+    /// Turned off in iOS Settings (only iOS Settings can turn it back on).
+    func isDenied() async -> Bool {
+        await UNUserNotificationCenter.current().notificationSettings().authorizationStatus == .denied
+    }
+
     /// Asks once (after onboarding, when the value is obvious) and registers.
     func requestAuthorizationAndRegister() async {
         let center = UNUserNotificationCenter.current()

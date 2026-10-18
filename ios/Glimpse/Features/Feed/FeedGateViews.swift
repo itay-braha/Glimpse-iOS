@@ -42,7 +42,7 @@ struct DensityGateView: View {
                 .padding(.horizontal, 24)
             }
             ShareLink(
-                item: "I'm on Glimpse: real people, real video, max 20 connections. Join me so it unlocks in our city!",
+                item: "I'm on Glimpse: real people, real video, max 15 connections. Join me so it unlocks in our city!",
                 subject: Text("Join me on Glimpse")
             ) {
                 Label("Invite friends to unlock faster", systemImage: "person.2.fill")
@@ -117,7 +117,7 @@ struct PausedFeedView: View {
     }
 }
 
-/// At 20/20, liking someone can release a connection. Make it a choice.
+/// At 15/15, liking someone can release a connection. Make it a choice.
 struct CapacityConfirmSheet: View {
     let candidateName: String
     let next: NextToBoot

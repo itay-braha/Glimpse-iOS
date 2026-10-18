@@ -119,6 +119,7 @@ struct ChatView: View {
                             await model.vibeAction(using: app.backend) {
                                 try await app.backend.vibeRespond(matchID: model.match.matchID, accept: accept)
                             }
+                            if accept { await app.offerAlerts(.vibeCheck, name: model.match.displayName) }
                         }
                     },
                     onJoin: { showCall = true }
@@ -195,12 +196,15 @@ struct ChatView: View {
         .task { recorder.demoFallback = app.isDemo }
         .task { await model.run(using: app.backend, myID: myID) }
         .sheet(isPresented: $showReport) {
-            ReportSheet(name: model.match.displayName) { reason, details in
-                try await app.backend.report(
-                    userID: model.match.otherUserID, reason: reason, details: details, matchID: model.match.matchID
-                )
-                leave()
-            }
+            ReportSheet(
+                name: model.match.displayName,
+                onSubmit: { reason, details in
+                    try await app.backend.report(
+                        userID: model.match.otherUserID, reason: reason, details: details, matchID: model.match.matchID
+                    )
+                },
+                onDone: { leave() }
+            )
         }
         .confirmationDialog("Unmatch \(model.match.displayName)?", isPresented: $confirmUnmatch, titleVisibility: .visible) {
             Button("Unmatch", role: .destructive) {
@@ -227,6 +231,7 @@ struct ChatView: View {
                         try await app.backend.vibePropose(matchID: model.match.matchID, at: date)
                     }
                     app.track("vibe_proposed")
+                    await app.offerAlerts(.vibeCheck, name: model.match.displayName)
                 }
             }
         }
@@ -332,6 +337,7 @@ struct ChatView: View {
                             } else {
                                 await model.send(using: app.backend)
                                 app.track("message_sent")
+                                await app.offerAlerts(.replies, name: model.match.displayName)
                             }
                         }
                     }
@@ -454,7 +460,7 @@ private struct ConversationIntro: View {
             Text("You matched with \(name)")
                 .font(.glimpseHeadline)
             if isEmpty {
-                Text("Say something real. Quiet connections are the first to go when either of you hits 20.")
+                Text("Say something real. Quiet connections are the first to go when either of you hits 15.")
                     .font(.footnote)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(Palette.textSecondary)

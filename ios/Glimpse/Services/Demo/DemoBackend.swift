@@ -1,12 +1,12 @@
 import Foundation
 
 /// In-memory backend for offline runs, previews, tests and CI screenshots.
-/// Applies the same product rules as the database: the 20-match cap and the
+/// Applies the same product rules as the database: the 15-match cap and the
 /// stalest-first auto-boot.
 actor DemoBackend: GlimpseBackend {
     nonisolated let isDemo = true
     static let demoCode = "123456"
-    static let cap = 20
+    static let cap = 15
 
     private let me = DemoData.meID
     private var signedIn: Bool
@@ -25,14 +25,14 @@ actor DemoBackend: GlimpseBackend {
     private var isPlus = false
     private var likeTimes: [Date] = []
     private var admirers: [FeedProfile]
-    private var revealedAdmirers: Set<UUID> = []
-    private var lastFreeReveal: Date?
     private var notices: [AppNotification]
+    /// 20 likes a day for everyone, Glimpse+ included (private.daily_like_allowance).
     private static let freeDailyLikes = 20
     private static let freeDailyViews = 50
     private var viewTimes: [Date] = []
     private var pausedUntil: Date?
     private var frozen: Set<UUID> = []
+    private var pinned: Set<UUID> = []
     private var missed: [MissedConnection]
     private var incomingSecondChances: [SecondChance]
     private var lastSecondChanceSent: Date?
@@ -40,7 +40,7 @@ actor DemoBackend: GlimpseBackend {
     /// Vibe Verified matches: 7-day immunity, separate from the user's freezes.
     private var immune: Set<UUID> = []
 
-    /// - Parameter seeded: start signed in with a complete profile and 20 matches.
+    /// - Parameter seeded: start signed in with a complete profile and 15 matches.
     /// `withVideos: false` starts signed in but before the first moment (onboarding's video hub).
     init(seeded: Bool = true, withVideos: Bool = true, now: Date = .now) {
         signedIn = seeded
@@ -254,7 +254,7 @@ actor DemoBackend: GlimpseBackend {
         // Same freemium rule as the server: liking back an admirer is always free.
         if liked && !likedMe.contains(userID) {
             pruneLikeTimes()
-            guard isPlus || likeTimes.count < Self.freeDailyLikes else { throw GlimpseError.outOfLikes }
+            guard likeTimes.count < Self.freeDailyLikes else { throw GlimpseError.outOfLikes }
             likeTimes.append(.now)
         }
         swiped.insert(userID)
@@ -308,9 +308,9 @@ actor DemoBackend: GlimpseBackend {
         viewTimes.removeAll { Date.now.timeIntervalSince($0) > 86_400 }
         let viewsRemaining = max(viewAllowance - viewTimes.count, 0)
         return LikeQuota(
-            allowance: isPlus ? 300 : Self.freeDailyLikes,
+            allowance: Self.freeDailyLikes,
             remaining: remainingLikes,
-            resetsAt: isPlus ? nil : resets,
+            resetsAt: resets,
             isPlus: isPlus,
             viewsAllowance: viewAllowance,
             viewsRemaining: viewsRemaining,
@@ -333,7 +333,7 @@ actor DemoBackend: GlimpseBackend {
     }
 
     private var remainingLikes: Int {
-        isPlus ? 300 : max(Self.freeDailyLikes - likeTimes.count, 0)
+        max(Self.freeDailyLikes - likeTimes.count, 0)
     }
 
     private func pruneLikeTimes() {
@@ -346,37 +346,19 @@ actor DemoBackend: GlimpseBackend {
         admirers.filter { !swiped.contains($0.id) }
     }
 
-    private var freeRevealsLeft: Int {
-        guard let lastFreeReveal else { return 1 }
-        return Date.now.timeIntervalSince(lastFreeReveal) > 86_400 ? 1 : 0
-    }
-
     func likesReceived() -> LikesReceived {
+        // Free for everyone: every admirer is shown.
         let items = pendingAdmirers.enumerated().map { index, person in
-            let visible = isPlus || revealedAdmirers.contains(person.id)
-            return ReceivedLike(
-                revealed: visible,
+            ReceivedLike(
+                revealed: true,
                 likedAt: Date.now.addingTimeInterval(-Double(index + 1) * 5_400),
-                age: visible ? nil : person.age,
-                distanceKm: visible ? nil : person.distanceKm,
-                isVerified: visible ? nil : person.isVerified,
-                profile: visible ? person : nil
+                age: nil,
+                distanceKm: nil,
+                isVerified: nil,
+                profile: person
             )
         }
-        return LikesReceived(
-            total: items.count,
-            isPlus: isPlus,
-            freeRevealsLeft: isPlus ? nil : freeRevealsLeft,
-            items: items
-        )
-    }
-
-    func revealLike() throws -> FeedProfile? {
-        guard isPlus || freeRevealsLeft > 0 else { throw GlimpseError.revealLimit }
-        guard let next = pendingAdmirers.first(where: { !revealedAdmirers.contains($0.id) }) else { return nil }
-        revealedAdmirers.insert(next.id)
-        if !isPlus { lastFreeReveal = .now }
-        return next
+        return LikesReceived(total: items.count, isPlus: isPlus, freeRevealsLeft: nil, items: items)
     }
 
     func verifyPurchase(signedTransaction: String) -> Bool {
@@ -429,6 +411,22 @@ actor DemoBackend: GlimpseBackend {
 
     func report(userID: UUID, reason: ReportReason, details: String?, matchID: UUID?) {
         block(userID: userID)
+    }
+
+    /// Mirrors public.set_pinned: up to 3, active matches only.
+    func setPinned(_ matchID: UUID, pinned isPinned: Bool) throws {
+        let active = Set(matches.map(\.matchID))
+        guard active.contains(matchID) else { throw GlimpseError.message("That conversation has ended.") }
+        if isPinned {
+            guard pinned.intersection(active).subtracting([matchID]).count < 3 else { throw GlimpseError.pinLimit }
+            pinned.insert(matchID)
+        } else {
+            pinned.remove(matchID)
+        }
+    }
+
+    func pinnedMatchIDs() -> Set<UUID> {
+        pinned.intersection(matches.map(\.matchID))
     }
 
     func setFrozen(_ matchID: UUID, frozen isFrozen: Bool) throws {
@@ -558,12 +556,25 @@ actor DemoBackend: GlimpseBackend {
     }
 
     /// Demo calls have no camera, so there's nothing to keep.
-    func uploadVibeRecording(matchID: UUID, fileURL: URL, startedAt: Date) {}
+    func uploadVibeSegment(
+        matchID: UUID, fileURL: URL, startedAt: Date, part: Int, duration: Double?, received: Bool
+    ) {}
+
+    func vibeBackupDecision(matchID: UUID) -> VibeBackupDecision { .discard }
 
     func logVibeCapture(matchID: UUID, kind: String) {}
 
     func setPushScope(_ scope: PushScope) {
         profile?.pushScope = scope
+    }
+
+    func setPushExtras(_ extras: [AlertExtra]) {
+        profile?.pushExtras = extras
+    }
+
+    func setDataConsent(aiTraining: Bool, sharing: Bool) {
+        profile?.consentAiTraining = aiTraining
+        profile?.consentDataSharing = sharing
     }
 
     func markRead(matchID: UUID) {

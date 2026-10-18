@@ -41,7 +41,7 @@ struct MatchCelebrationView: View {
                         Image(systemName: "arrow.triangle.2.circlepath")
                             .font(.title3)
                             .foregroundStyle(Palette.pink)
-                        Text("To keep your circle at 20, your quietest connection with **\(booted.displayName)** was released.")
+                        Text("To keep your circle at 15, your quietest connection with **\(booted.displayName)** was released.")
                             .font(.subheadline)
                             .foregroundStyle(Palette.textPrimary)
                     }

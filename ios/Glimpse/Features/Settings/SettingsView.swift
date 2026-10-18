@@ -100,6 +100,19 @@ struct SettingsView: View {
                         }
                     }
                     .accessibilityIdentifier("settings.pushScope")
+                    if app.profile?.pushScope == .messages {
+                        ForEach(AlertExtra.allCases) { extra in
+                            Toggle("Also: \(extra.title)", isOn: Binding(
+                                get: { app.profile?.pushExtras?.contains(extra) ?? false },
+                                set: { on in
+                                    var extras = (app.profile?.pushExtras ?? []).filter { $0 != extra }
+                                    if on { extras.append(extra) }
+                                    Task { await app.setPushExtras(extras) }
+                                }
+                            ))
+                            .accessibilityIdentifier("settings.extra.\(extra.rawValue)")
+                        }
+                    }
                     Button("iPhone notification settings", systemImage: "bell.badge") {
                         if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
                             openURL(url)
@@ -109,6 +122,27 @@ struct SettingsView: View {
                     Text("Alerts")
                 } footer: {
                     Text((app.profile?.pushScope ?? .all).detail)
+                }
+
+                Section {
+                    Toggle("Help improve matching", isOn: Binding(
+                        get: { app.profile?.consentAiTraining ?? false },
+                        set: { on in
+                            Task { await app.setDataConsent(aiTraining: on, sharing: app.profile?.consentDataSharing ?? false) }
+                        }
+                    ))
+                    .accessibilityIdentifier("settings.consentTraining")
+                    Toggle("Share anonymous trends", isOn: Binding(
+                        get: { app.profile?.consentDataSharing ?? false },
+                        set: { on in
+                            Task { await app.setDataConsent(aiTraining: app.profile?.consentAiTraining ?? false, sharing: on) }
+                        }
+                    ))
+                    .accessibilityIdentifier("settings.consentSharing")
+                } header: {
+                    Text("Your data")
+                } footer: {
+                    Text("Both are off unless you turn them on. Matching models learn from your activity under a random code, never your messages, videos, name or exact location. Trends are only shared as totals for groups of 20 or more people.")
                 }
 
                 Section("About") {

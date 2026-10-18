@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// "Liked you": the freemium hook. Free users see how many people are waiting,
-/// teaser cards (age, distance, verified) and get one reveal a day. Glimpse+
-/// members see everyone and can answer straight from here.
+/// "Liked you": free for everyone. Every admirer is shown and can be answered
+/// straight from here.
 struct LikesYouView: View {
     @Environment(AppModel.self) private var app
     @State private var model = LikesYouModel()
@@ -25,13 +24,9 @@ struct LikesYouView: View {
                 } else {
                     LazyVGrid(columns: columns, spacing: 10) {
                         ForEach(model.likes.items) { like in
-                            if let profile = like.profile, like.revealed {
+                            if let profile = like.profile {
                                 RevealedLikeCard(profile: profile, thumbnailURL: thumbnail(for: profile)) {
                                     previewing = profile
-                                }
-                            } else {
-                                HiddenLikeCard(like: like) {
-                                    app.paywall = .likedYou
                                 }
                             }
                         }
@@ -50,9 +45,6 @@ struct LikesYouView: View {
         .task {
             await model.load(using: app.backend)
             app.track("likes_you_viewed", ["total": "\(model.likes.total)"])
-        }
-        .onChange(of: app.paywall) { _, newValue in
-            if newValue == nil { Task { await model.load(using: app.backend) } }
         }
         .sheet(item: $previewing) { profile in
             AdmirerPreview(
@@ -92,67 +84,11 @@ struct LikesYouView: View {
                 .font(.subheadline)
                 .foregroundStyle(Palette.textSecondary)
 
-            if !model.likes.isPlus && model.hiddenCount > 0 {
-                HStack(spacing: 10) {
-                    Button {
-                        Task {
-                            app.track("like_reveal_tapped")
-                            if !(await model.reveal(using: app.backend)) {
-                                app.paywall = .likedYou
-                            }
-                        }
-                    } label: {
-                        Label(
-                            (model.likes.freeRevealsLeft ?? 0) > 0 ? "Reveal 1 free" : "Revealed today",
-                            systemImage: "eye.fill"
-                        )
-                    }
-                    .buttonStyle(.glimpseSecondary)
-                    .disabled((model.likes.freeRevealsLeft ?? 0) == 0)
-
-                    Button("See all") { app.paywall = .likedYou }
-                        .buttonStyle(.glimpse)
-                }
-                .padding(.top, 4)
-            }
         }
     }
 
     private func thumbnail(for profile: FeedProfile) -> URL? {
         profile.videos.first?.thumbnailPath.flatMap { model.mediaURLs[$0] }
-    }
-}
-
-private struct HiddenLikeCard: View {
-    let like: ReceivedLike
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Palette.brandGradient
-                .opacity(0.55)
-                .overlay { Rectangle().fill(.ultraThinMaterial) }
-                .aspectRatio(3 / 4, contentMode: .fit)
-                .overlay {
-                    VStack(spacing: 8) {
-                        Image(systemName: "lock.fill")
-                            .font(.title2)
-                        if let age = like.age {
-                            Text("\(age)").font(.glimpseTitle2)
-                        }
-                        if let km = like.distanceKm {
-                            Text("\(km) km away").font(.caption.weight(.semibold))
-                        }
-                        if like.isVerified == true {
-                            VerifiedBadge(size: 18)
-                        }
-                    }
-                    .foregroundStyle(Palette.textPrimary)
-                }
-                .clipShape(.rect(cornerRadius: 18))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Hidden admirer\(like.age.map { ", \($0)" } ?? ""). Unlock with Glimpse Plus.")
     }
 }
 

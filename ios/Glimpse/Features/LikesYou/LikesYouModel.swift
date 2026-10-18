@@ -12,8 +12,6 @@ final class LikesYouModel {
     /// Set after a like-back creates a match, to show the celebration.
     var celebration: MatchCelebration?
 
-    var hiddenCount: Int { likes.items.filter { !$0.revealed }.count }
-
     func load(using backend: any GlimpseBackend) async {
         isLoading = true
         defer {
@@ -25,20 +23,6 @@ final class LikesYouModel {
             await resolveMedia(using: backend)
         } catch {
             errorMessage = GlimpseError.describe(error)
-        }
-    }
-
-    /// Spends the daily free reveal. Returns false when Glimpse+ is needed.
-    func reveal(using backend: any GlimpseBackend) async -> Bool {
-        do {
-            _ = try await backend.revealLike()
-            await load(using: backend)
-            return true
-        } catch GlimpseError.revealLimit {
-            return false
-        } catch {
-            errorMessage = GlimpseError.describe(error)
-            return true
         }
     }
 

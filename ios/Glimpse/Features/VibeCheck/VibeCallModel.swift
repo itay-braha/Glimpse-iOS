@@ -54,7 +54,7 @@ final class VibeCallModel {
     private var screenshotObserver: (any NSObjectProtocol)?
     private var offerSent = false
     private var endsAt: Date?
-    private var recorder: VibeSafetyRecorder?
+    private var recorders: [VibeSafetyRecorder] = []
 
     var isDemo: Bool { backend.isDemo }
 
@@ -131,6 +131,7 @@ final class VibeCallModel {
             NotificationCenter.default.removeObserver(screenshotObserver)
         }
         client?.onLocalFrame = nil
+        client?.onRemoteFrame = nil
         client?.close()
         client = nil
         finishRecording()
@@ -299,24 +300,37 @@ final class VibeCallModel {
 
     // MARK: Safety recording
 
-    /// Records what this phone's camera and microphone send, from the moment the call is live.
+    /// Records what this phone sends (uploaded piece by piece during the call) and a
+    /// low-quality backup of what it receives, from the moment the call is live.
     private func startRecording() {
-        guard let client, recorder == nil else { return }
-        let recorder = VibeSafetyRecorder()
-        recorder.start()
-        client.onLocalFrame = { @Sendable frame in recorder.append(frame) }
-        self.recorder = recorder
-    }
-
-    /// Finishes the file and queues it for upload (retried on later launches if needed).
-    private func finishRecording() {
-        guard let recorder else { return }
-        self.recorder = nil
+        guard let client, recorders.isEmpty else { return }
         let matchID = match.matchID
         let backend = backend
+        let deliver: @Sendable (VibeSafetyRecorder.Segment) -> Void = { segment in
+            Task { @MainActor in
+                VibeRecordingUploads.enqueue(segment, matchID: matchID)
+                if segment.stream == .own {
+                    await VibeRecordingUploads.uploadPending(using: backend)
+                }
+            }
+        }
+        let own = VibeSafetyRecorder(stream: .own, onSegment: deliver)
+        let received = VibeSafetyRecorder(stream: .received, onSegment: deliver)
+        own.start()
+        received.start()
+        client.onLocalFrame = { @Sendable frame in own.append(frame) }
+        client.onRemoteFrame = { @Sendable frame in received.append(frame) }
+        recorders = [own, received]
+    }
+
+    /// Closes the last pieces; anything not yet uploaded is retried on later launches.
+    private func finishRecording() {
+        let recorders = recorders
+        self.recorders = []
+        guard !recorders.isEmpty else { return }
+        let backend = backend
         Task { @MainActor in
-            guard let url = await recorder.finish() else { return }
-            VibeRecordingUploads.enqueue(url, matchID: matchID, startedAt: recorder.startedAt)
+            for recorder in recorders { await recorder.finish() }
             await VibeRecordingUploads.uploadPending(using: backend)
         }
     }

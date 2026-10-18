@@ -23,6 +23,11 @@ struct MainTabView: View {
                 Task { await app.choseAlerts(scope) }
             }
         }
+        .sheet(item: $app.alertNudge) { nudge in
+            AlertNudgeSheet(nudge: nudge) { accepted, never in
+                Task { await app.answerNudge(nudge, accepted: accepted, never: never) }
+            }
+        }
         .sheet(item: $app.paywall) { reason in
             PaywallView(reason: reason)
         }

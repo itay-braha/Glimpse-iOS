@@ -19,6 +19,8 @@ struct LaunchOptions: Sendable {
         case firstVideo
         /// Feed with the "what should buzz?" sheet up.
         case alerts
+        /// The in-context Vibe Check alert offer (for screenshots).
+        case alertNudge
     }
 
     var forceDemo = false

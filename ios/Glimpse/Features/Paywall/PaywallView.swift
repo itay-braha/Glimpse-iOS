@@ -2,13 +2,12 @@ import StoreKit
 import SwiftUI
 
 /// Glimpse+ upsell. Sells convenience and curiosity, never more connections:
-/// the 20-match cap applies to everyone.
+/// the 15-match cap, 20 daily likes and "Liked you" are the same for everyone.
 struct PaywallView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.dismiss) private var dismiss
     let reason: PaywallReason
 
-    @State private var quota: LikeQuota?
     @State private var legal: LegalDocument?
 
     private var store: StoreManager { app.store }
@@ -39,20 +38,13 @@ struct PaywallView: View {
                             .heroFont()
                             .minimumScaleFactor(0.6)
                             .foregroundStyle(Palette.textPrimary)
-                        if reason == .outOfLikes, let resets = quota?.resetsAt {
-                            Text("Free likes refill \(resets, format: .relative(presentation: .named)).")
-                                .foregroundStyle(Palette.textSecondary)
-                        }
                     }
 
                     VStack(alignment: .leading, spacing: 16) {
-                        Benefit(symbol: "heart.fill", title: "Unlimited likes", detail: "Keep exploring without a daily limit.")
-                        Benefit(symbol: "eye.fill", title: "See everyone who liked you", detail: "No blur, no waiting for tomorrow's reveal.")
-                        Benefit(symbol: "bolt.heart.fill", title: "Answer instantly", detail: "Like back from your list, and it's a match.")
                         Benefit(symbol: "rectangle.stack.fill", title: "150 new profiles a day", detail: "Three times the daily glimpses.")
                         Benefit(symbol: "snowflake", title: "Freeze up to 3 connections", detail: "Protect your favorites from auto-release.")
                         Benefit(symbol: "arrow.uturn.backward.circle.fill", title: "Second chances", detail: "Ask a released connection to reconnect, once a week.")
-                        Benefit(symbol: "circle.dashed", title: "Same 20-connection circle", detail: "Some things aren't for sale. Real conversations still win.")
+                        Benefit(symbol: "circle.dashed", title: "Same 15-connection circle, same 20 likes", detail: "Some things aren't for sale. Real conversations still win.")
                     }
                     .padding(18)
                     .background(Palette.surface.opacity(0.85), in: .rect(cornerRadius: 22))
@@ -70,7 +62,6 @@ struct PaywallView: View {
         }
         .task {
             await store.loadProducts()
-            quota = try? await app.backend.likeQuota()
             app.track("paywall_viewed", ["reason": reason.rawValue])
         }
         .sheet(item: $legal) { document in
@@ -80,9 +71,7 @@ struct PaywallView: View {
 
     private var headline: String {
         switch reason {
-        case .outOfLikes: "You're on a roll."
         case .outOfViews: "See more people today."
-        case .likedYou: "See who wants to see more."
         case .freeze: "Protect the ones that matter."
         case .secondChance: "Everyone deserves a second chance."
         case .settings: "More glimpses, less waiting."

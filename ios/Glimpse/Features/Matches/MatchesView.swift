@@ -53,6 +53,15 @@ struct MatchesView: View {
                     .listRowBackground(Palette.surface)
                 }
 
+                if !model.pinnedMatches.isEmpty {
+                    Section("Pinned") {
+                        ForEach(model.pinnedMatches) { match in
+                            conversationRow(match)
+                        }
+                    }
+                    .listRowBackground(Palette.surface)
+                }
+
                 if !model.newMatches.isEmpty {
                     Section("New matches") {
                         ScrollView(.horizontal) {
@@ -62,6 +71,7 @@ struct MatchesView: View {
                                         NewMatchBubble(match: match, imageURL: model.avatarURL(for: match))
                                     }
                                     .buttonStyle(.plain)
+                                    .contextMenu { pinButton(match) }
                                 }
                             }
                             .padding(.horizontal, 16)
@@ -75,33 +85,7 @@ struct MatchesView: View {
 
                 Section("Conversations") {
                     ForEach(model.conversations) { match in
-                        NavigationLink(value: match) {
-                            MatchRow(
-                                match: match,
-                                imageURL: model.avatarURL(for: match),
-                                isNextToRelease: model.isNextToRelease(match)
-                            )
-                        }
-                        .swipeActions(edge: .trailing) {
-                            Button("Unmatch", systemImage: "xmark.circle", role: .destructive) {
-                                pendingUnmatch = match
-                            }
-                        }
-                        .swipeActions(edge: .leading) {
-                            Button(match.isFrozen == true ? "Unfreeze" : "Freeze", systemImage: "snowflake") {
-                                Task {
-                                    do {
-                                        try await model.toggleFreeze(match, using: app.backend)
-                                        app.matchesDidChange()
-                                    } catch GlimpseError.freezeLimit {
-                                        app.paywall = .freeze
-                                    } catch {
-                                        model.errorMessage = GlimpseError.describe(error)
-                                    }
-                                }
-                            }
-                            .tint(Color(hex: 0x7AF0FF))
-                        }
+                        conversationRow(match)
                     }
                     if model.conversations.isEmpty && model.hasLoaded {
                         Text("No conversations yet. Your matches are waiting for a hello.")
@@ -120,7 +104,7 @@ struct MatchesView: View {
                         )
                     }
                 } footer: {
-                    Text("Swipe right on a conversation to freeze it. Frozen connections are skipped by auto-release while you keep talking.")
+                    Text("Swipe right on a conversation to pin it to the top (up to 3) or freeze it. Frozen connections are skipped by auto-release while you keep talking.")
                 }
                 .listRowBackground(Palette.surface)
             }
@@ -167,8 +151,58 @@ struct MatchesView: View {
         }
         .task(id: app.matchesVersion) {
             await model.load(using: app.backend)
-            app.openLaunchChatIfNeeded(from: model.conversations)
+            app.openLaunchChatIfNeeded(from: model.pinnedMatches + model.conversations)
         }
+        .alert(
+            "Couldn't do that",
+            isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(model.errorMessage ?? "")
+        }
+    }
+
+    private func conversationRow(_ match: MatchSummary) -> some View {
+        NavigationLink(value: match) {
+            MatchRow(
+                match: match,
+                imageURL: model.avatarURL(for: match),
+                isNextToRelease: model.isNextToRelease(match),
+                isPinned: model.isPinned(match)
+            )
+        }
+        .contextMenu { pinButton(match) }
+        .swipeActions(edge: .trailing) {
+            Button("Unmatch", systemImage: "xmark.circle", role: .destructive) {
+                pendingUnmatch = match
+            }
+        }
+        .swipeActions(edge: .leading) {
+            pinButton(match)
+                .tint(Palette.amber)
+            Button(match.isFrozen == true ? "Unfreeze" : "Freeze", systemImage: "snowflake") {
+                Task {
+                    do {
+                        try await model.toggleFreeze(match, using: app.backend)
+                        app.matchesDidChange()
+                    } catch GlimpseError.freezeLimit {
+                        app.paywall = .freeze
+                    } catch {
+                        model.errorMessage = GlimpseError.describe(error)
+                    }
+                }
+            }
+            .tint(Color(hex: 0x7AF0FF))
+        }
+    }
+
+    private func pinButton(_ match: MatchSummary) -> some View {
+        let pinned = model.isPinned(match)
+        return Button(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin") {
+            Task { await model.togglePin(match, using: app.backend) }
+        }
+        .accessibilityIdentifier("matches.pin")
     }
 }
 
@@ -298,6 +332,7 @@ private struct MatchRow: View {
     let match: MatchSummary
     let imageURL: URL?
     let isNextToRelease: Bool
+    var isPinned = false
 
     private var isQuiet: Bool {
         Date.now.timeIntervalSince(match.lastActivity) > 5 * 86_400
@@ -316,6 +351,12 @@ private struct MatchRow: View {
                     Text(match.displayName)
                         .font(.glimpseHeadline)
                         .foregroundStyle(Palette.textPrimary)
+                    if isPinned {
+                        Image(systemName: "pin.fill")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(Palette.amber)
+                            .accessibilityLabel("Pinned")
+                    }
                     if match.isFrozen == true {
                         Image(systemName: "snowflake")
                             .font(.caption.weight(.bold))

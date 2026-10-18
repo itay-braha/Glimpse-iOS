@@ -7,7 +7,7 @@ struct CapacityStatus: Codable, Hashable, Sendable {
     var nextToBoot: NextToBoot?
     var freezesAllowed: Int?
 
-    static let empty = CapacityStatus(active: 0, cap: 20, atCapacity: false, nextToBoot: nil, freezesAllowed: 1)
+    static let empty = CapacityStatus(active: 0, cap: 15, atCapacity: false, nextToBoot: nil, freezesAllowed: 1)
 
     enum CodingKeys: String, CodingKey {
         case active

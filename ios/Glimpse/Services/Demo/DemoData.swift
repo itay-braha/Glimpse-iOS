@@ -210,7 +210,7 @@ enum DemoData {
     ]
 
     static func matches(now: Date = .now) -> [MatchSummary] {
-        matchNames.enumerated().map { index, name in
+        matchNames.prefix(DemoBackend.cap).enumerated().map { index, name in
             // Dana (index 0) has gone quiet: the auto-boot engine's next pick.
             let quietDays: Double = index == 0 ? 19 : Double(index % 7) * 0.6 + Double(index) * 0.08
             let count = index == 0 ? 1 : 6 + (index * 5) % 37

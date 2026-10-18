@@ -29,7 +29,7 @@ struct WelcomeView: View {
                     ValueProp(symbol: "play.rectangle.fill", tint: Palette.mint,
                               title: "Video-first", detail: "Your Reels and real moments, not studio shots.")
                     ValueProp(symbol: "circle.dashed", tint: Palette.pink,
-                              title: "20 connections, max", detail: "Quiet chats make room for new ones.")
+                              title: "15 connections, max", detail: "Quiet chats make room for new ones.")
                     ValueProp(symbol: "checkmark.shield.fill", tint: Color(hex: 0x7AF0FF),
                               title: "Verified humans", detail: "Real numbers, real devices, no catfish.")
                 }

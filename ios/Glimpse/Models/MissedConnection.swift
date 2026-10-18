@@ -1,6 +1,6 @@
 import Foundation
 
-/// A connection auto-released by the 20-cap (kept for 30 days).
+/// A connection auto-released by the 15-cap (kept for 30 days).
 struct MissedConnection: Codable, Identifiable, Hashable, Sendable {
     let matchID: UUID
     var userID: UUID

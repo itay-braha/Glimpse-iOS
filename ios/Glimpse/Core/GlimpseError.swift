@@ -23,7 +23,6 @@ enum GlimpseError: LocalizedError, Equatable {
     /// Free daily likes are used up (Glimpse+ or waiting lifts it).
     case outOfLikes
     /// The free daily "who liked you" reveal is used up.
-    case revealLimit
     /// Abuse protection: too many actions in a short time.
     case rateLimited
     /// Daily limit on new profiles seen.
@@ -31,6 +30,7 @@ enum GlimpseError: LocalizedError, Equatable {
     /// The account is on a break (vacation mode).
     case paused
     case freezeLimit
+    case pinLimit
     case plusRequired
     case secondChanceLimit
     case message(String)
@@ -51,11 +51,11 @@ enum GlimpseError: LocalizedError, Equatable {
         case .storyLink: "Stories disappear after 24 hours. Save it to your camera roll and upload it instead."
         case .videoTooLarge: "That video is over 20 MB. Try a shorter clip."
         case .outOfLikes: "You're out of likes for now."
-        case .revealLimit: "Your free reveal comes back tomorrow."
         case .rateLimited: "Whoa, slow down a little. Try again in a minute."
         case .outOfViews: "You've seen today's glimpses."
         case .paused: "Your profile is on a break. Resume it to keep exploring."
         case .freezeLimit: "You've used your free freeze. Glimpse+ protects up to 3 connections."
+        case .pinLimit: "You can pin up to 3 conversations. Unpin one first."
         case .plusRequired: "That's part of Glimpse+."
         case .secondChanceLimit: "You can send one second chance a week."
         case let .message(text): text

@@ -58,9 +58,9 @@ struct CapacityPill: View {
 
 #Preview {
     VStack(spacing: 24) {
-        CapacityRing(active: 12, cap: 20)
-        CapacityRing(active: 19, cap: 20)
-        CapacityPill(active: 20, cap: 20)
+        CapacityRing(active: 9, cap: 15)
+        CapacityRing(active: 14, cap: 15)
+        CapacityPill(active: 15, cap: 15)
     }
     .padding()
     .background(Palette.midnight)

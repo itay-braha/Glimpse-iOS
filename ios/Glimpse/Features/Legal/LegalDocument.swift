@@ -8,7 +8,7 @@ enum LegalDocument: String, Identifiable, CaseIterable {
     case communityRules
 
     static let contactEmail = "support@glimpse.invalid"
-    static let lastUpdated = "October 15, 2026"
+    static let lastUpdated = "October 18, 2026"
 
     var id: String { rawValue }
 
@@ -39,7 +39,7 @@ enum LegalDocument: String, Identifiable, CaseIterable {
     You own the videos and messages you share. You give Glimpse a license to host, display and distribute them inside the app so the service can work. Only share content you have the right to share, and only content that shows you.
 
     ## How Glimpse works
-    You can hold up to 20 active connections. When you approve a new match while at 20, your least active connection is ended automatically. Glimpse may adjust how often profiles are shown based on how members treat each other.
+    You can hold up to 15 active connections. When you approve a new match while at 15, your least active connection is ended automatically. Glimpse may adjust how often profiles are shown based on how members treat each other.
 
     ## Safety and enforcement
     We may hide content, suspend or close accounts, and block devices that break these terms or the Community Rules. Serious violations can result in a permanent ban from the service on the device used.
@@ -62,14 +62,19 @@ enum LegalDocument: String, Identifiable, CaseIterable {
 
     ## What we collect
     **Account:** your phone number (to verify you're a real person) and the profile details you enter.
-    **Content:** videos you record or import, and messages you send.
-    **Vibe Check safety recordings:** during a 3-Minute Vibe Check, each phone records what its own camera and microphone send. You agree to this before every call. Recordings are stored privately for 30 days and deleted after that. Nobody watches them unless one of you reports the call; then only Glimpse's safety team does, and they're kept until the report is closed. Screenshots and screen-recording attempts during a call are logged.
+    **Content:** videos you record or import, and messages you send (text, voice and video notes). If you delete a message, it disappears from the chat, but a copy is kept privately for 30 days (longer if the conversation is reported) so the safety team can review reports.
+    **Vibe Check safety recordings:** during a 3-Minute Vibe Check, each phone records what its own camera and microphone send, plus a low-quality copy of the video it receives, and uploads them to Glimpse's private storage while the call is running. You agree to this before every call. Recordings are stored privately for 30 days and deleted after that. Nobody watches them unless one of you reports the call; then only Glimpse's safety team does, and they're kept until the report is closed. Screenshots and screen-recording attempts during a call are logged.
     **Approximate location:** rounded to about 1 km, used only to show people nearby and distances. Your exact location is never stored.
     **Device integrity:** Apple DeviceCheck signals that help keep banned accounts off Glimpse. These don't identify you personally.
     **Usage and diagnostics:** basic in-app events and crash reports, used to keep Glimpse working.
 
     ## How we use it
-    To run your profile, show you people, enforce the 20-connection limit, keep the community safe, send the notifications you allow, and improve the app. We do not sell your personal information and we do not show third-party ads.
+    To run your profile, show you people, enforce the 15-connection limit, keep the community safe, send the notifications you allow, and improve the app. We do not show third-party ads.
+
+    ## Optional: research and model training
+    Both are off unless you turn them on in Settings, and you can turn them off at any time.
+    **Help improve matching:** your activity (likes, passes, watch time, match outcomes and conversation rhythm, never message text, videos, your name, phone number or exact location) may be used under a random code instead of your identity to train Glimpse's own matching and safety models.
+    **Share anonymous trends:** statistics about groups of at least 20 members (for example, like rates by age range and region) may be shared with research or business partners. Nothing about you individually is shared, and we never sell your personal information.
 
     ## Who can see what
     Your profile and videos are visible to people Glimpse shows you to and to your matches. Messages are visible only to you and the person you're talking to. Vibe Check calls can't be screenshotted or screen-recorded inside Glimpse, and their safety recordings are never shown to the other person or anyone else outside the safety team. Reports you file are confidential.

@@ -8,6 +8,7 @@ struct FeedView: View {
     @State private var reportTarget: FeedProfile?
     @State private var capacityPrompt: FeedProfile?
     @State private var skipCapacityPrompt = false
+    @State private var showLikesInfo = false
 
     var body: some View {
         GeometryReader { proxy in
@@ -46,6 +47,11 @@ struct FeedView: View {
         }
         .animation(.smooth(duration: 0.35), value: model.celebration)
         .toolbar(model.celebration == nil ? .visible : .hidden, for: .tabBar)
+        .alert("That's today's likes", isPresented: $showLikesInfo) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(likesInfoMessage)
+        }
         .sheet(item: $capacityPrompt) { profile in
             if let next = model.capacity.nextToBoot {
                 CapacityConfirmSheet(
@@ -80,10 +86,13 @@ struct FeedView: View {
             }
         }
         .sheet(item: $reportTarget) { profile in
-            ReportSheet(name: profile.displayName) { reason, details in
-                try await app.backend.report(userID: profile.id, reason: reason, details: details, matchID: nil)
-                model.remove(profile.id)
-            }
+            ReportSheet(
+                name: profile.displayName,
+                onSubmit: { reason, details in
+                    try await app.backend.report(userID: profile.id, reason: reason, details: details, matchID: nil)
+                },
+                onDone: { model.remove(profile.id) }
+            )
         }
         .task {
             FeedSignals.shared.configure(app.backend)
@@ -146,13 +155,20 @@ struct FeedView: View {
         .animation(.smooth(duration: 0.4), value: model.currentID)
     }
 
+    /// Everyone gets 20 likes a day; nothing to buy. Liking back and passing stay free.
+    private var likesInfoMessage: String {
+        let base = "Everyone gets 20 likes a day, so each one means something. Liking back someone who liked you and passing are always free."
+        guard let resets = model.quota?.resetsAt, (model.quota?.remaining ?? 1) == 0 else { return base }
+        return base + " More " + resets.formatted(.relative(presentation: .named)) + "."
+    }
+
     private var topBar: some View {
         HStack {
             Wordmark(size: 26)
             Spacer()
-            if let quota = model.quota, !quota.isPlus, quota.remaining <= 5 {
+            if let quota = model.quota, quota.remaining <= 5 {
                 LikesLeftPill(remaining: quota.remaining) {
-                    app.paywall = .outOfLikes
+                    showLikesInfo = true
                 }
             }
             CapacityPill(active: model.capacity.active, cap: model.capacity.cap)
@@ -237,11 +253,12 @@ struct FeedView: View {
             case .matched:
                 app.track("match_created")
                 app.matchesDidChange()
+                await app.offerAlerts(.newMatch, name: profile.displayName)
             case .liked:
                 app.track("profile_liked")
             case .outOfLikes:
                 app.track("out_of_likes")
-                app.paywall = .outOfLikes
+                showLikesInfo = true
             case .outOfViews:
                 app.track("out_of_views")
             case .failed:
@@ -251,7 +268,7 @@ struct FeedView: View {
     }
 }
 
-/// Appears when a free user is down to their last few daily likes.
+/// Appears when someone is down to their last few daily likes.
 private struct LikesLeftPill: View {
     let remaining: Int
     let action: () -> Void
@@ -266,17 +283,17 @@ private struct LikesLeftPill: View {
                 .background(.ultraThinMaterial, in: .capsule)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(remaining == 0 ? "No likes left today. Learn about Glimpse Plus" : "\(remaining) likes left today")
+        .accessibilityLabel(remaining == 0 ? "No likes left today" : "\(remaining) likes left today")
     }
 }
 
-/// Shown while the user is at 20/20: liking someone can release the quietest connection.
+/// Shown while the user is at 15/15: liking someone can release the quietest connection.
 private struct CapacityNotice: View {
     let nextName: String
 
     var body: some View {
         Label {
-            Text("At 20. A new match releases **\(nextName)**, your quietest chat.")
+            Text("At \(MatchesModel.cap). A new match releases **\(nextName)**, your quietest chat.")
         } icon: {
             Image(systemName: "arrow.triangle.2.circlepath")
         }

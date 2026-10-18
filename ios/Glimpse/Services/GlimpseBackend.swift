@@ -44,10 +44,8 @@ protocol GlimpseBackend: AnyObject, Sendable {
     func capacityStatus() async throws -> CapacityStatus
     func likeQuota() async throws -> LikeQuota
 
-    // MARK: Liked you (freemium)
+    // MARK: Liked you (free for everyone)
     func likesReceived() async throws -> LikesReceived
-    /// Uses the daily free reveal (Glimpse+ doesn't need it). Nil when nobody is hidden.
-    func revealLike() async throws -> FeedProfile?
 
     // MARK: Glimpse+
     /// Sends a StoreKit 2 signed transaction for server verification; returns whether Plus is active.
@@ -59,6 +57,9 @@ protocol GlimpseBackend: AnyObject, Sendable {
     func block(userID: UUID) async throws
     func report(userID: UUID, reason: ReportReason, details: String?, matchID: UUID?) async throws
     func setFrozen(_ matchID: UUID, frozen: Bool) async throws
+    /// Pins are personal (the other person never sees them), up to 3.
+    func setPinned(_ matchID: UUID, pinned: Bool) async throws
+    func pinnedMatchIDs() async throws -> Set<UUID>
     func submitExitFeedback(matchID: UUID, reason: ExitReason) async throws
     func missedConnections() async throws -> [MissedConnection]
     func requestSecondChance(matchID: UUID) async throws
@@ -91,8 +92,13 @@ protocol GlimpseBackend: AnyObject, Sendable {
     func vibeSubmitResult(matchID: UUID, outcome: VibeOutcome) async throws -> Bool
     func vibeIceServers(matchID: UUID) async throws -> [IceServerConfig]
     func openVibeSignaling(matchID: UUID) async -> VibeSignalChannel
-    /// Uploads this phone's safety recording of a call (kept 30 days; opened only if the call is reported).
-    func uploadVibeRecording(matchID: UUID, fileURL: URL, startedAt: Date) async throws
+    /// One 20-second piece of a Vibe Check safety recording. `received`: this phone's
+    /// backup copy of the other person's video.
+    func uploadVibeSegment(
+        matchID: UUID, fileURL: URL, startedAt: Date, part: Int, duration: Double?, received: Bool
+    ) async throws
+    /// Whether this phone's backup copy is needed (their own recording missing, or a report).
+    func vibeBackupDecision(matchID: UUID) async throws -> VibeBackupDecision
     /// A screenshot or screen-recording attempt during a call, for the safety team.
     func logVibeCapture(matchID: UUID, kind: String) async
 
@@ -101,6 +107,9 @@ protocol GlimpseBackend: AnyObject, Sendable {
     func markNotificationsRead(_ ids: [UUID]?) async throws
     func registerPushToken(_ token: String, environment: String) async throws
     func setPushScope(_ scope: PushScope) async throws
+    func setPushExtras(_ extras: [AlertExtra]) async throws
+    /// Both are opt-in and off by default.
+    func setDataConsent(aiTraining: Bool, sharing: Bool) async throws
     func unregisterPushToken(_ token: String) async
 
     // MARK: Verification

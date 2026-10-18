@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Connections the 20-cap released in the last 30 days. Nobody can message
+/// Connections the 15-cap released in the last 30 days. Nobody can message
 /// from here; Glimpse+ members can ask for a consent-based second chance.
 struct MissedConnectionsView: View {
     @Environment(AppModel.self) private var app

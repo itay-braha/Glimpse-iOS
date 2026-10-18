@@ -12,6 +12,14 @@ enum ReportReason: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
+    /// Reasons the safety team acts on right away.
+    var isUrgent: Bool {
+        switch self {
+        case .harassment, .inappropriateContent, .underage: true
+        default: false
+        }
+    }
+
     var label: String {
         switch self {
         case .harassment: "Harassment or threats"

@@ -115,13 +115,13 @@ final class FlowTests: XCTestCase {
         snap("1-6 Feed")
     }
 
-    // A -> D: at 20/20 a like becomes a choice, then a match, then a conversation.
+    // A -> D: at 15/15 a like becomes a choice, then a match, then a conversation.
     func testMatchAtCapacityThenChat() {
         let app = launch("feed")
         let like = app.buttons["Glimpse"].firstMatch
         XCTAssertTrue(like.waitForExistence(timeout: 20))
         pause(5)
-        snap("2-1 Feed at 20 of 20")
+        snap("2-1 Feed at 15 of 15")
         like.tap()
 
         let anyway = app.buttons["Like Maya anyway"]
@@ -194,23 +194,54 @@ final class FlowTests: XCTestCase {
     }
 
     // A -> D: freemium "Liked you": teaser, free daily reveal, Glimpse+.
-    func testLikedYouAndGlimpsePlus() {
+    func testLikedYouIsFree() {
         let app = launch("likes")
         XCTAssertTrue(text(app, containing: "want to see more").waitForExistence(timeout: 20))
+        XCTAssertTrue(button(app, containing: "Liked you.").waitForExistence(timeout: 10), "admirers are shown, not blurred")
+        XCTAssertFalse(button(app, containing: "Reveal").exists)
         pause(1)
-        snap("4-1 Liked you (free)")
+        snap("4-1 Liked you: everyone, free")
+    }
 
-        button(app, containing: "Reveal 1 free").tap()
-        pause(2)
-        snap("4-2 Daily free reveal")
+    // A rare alert offer, pinning a chat, and the report confirmation.
+    func testPinsReportAndAlertOffer() {
+        let app = launch("alertNudge")
+        let notNow = app.buttons["nudge.notNow"]
+        XCTAssertTrue(notNow.waitForExistence(timeout: 20))
+        snap("10-1 Vibe Check alert offer")
+        notNow.tap()
+        XCTAssertTrue(waitUntilGone(notNow, timeout: 5))
 
-        app.buttons["See all"].tap()
-        let tryPlus = button(app, containing: "Try Glimpse+")
-        XCTAssertTrue(tryPlus.waitForExistence(timeout: 10))
-        snap("4-3 Glimpse+ paywall")
-        tryPlus.tap()
-        pause(3)
-        snap("4-4 Everyone revealed with Glimpse+")
+        app.tabBars.buttons["Connections"].tap()
+        let hila = app.cells.containing(NSPredicate(format: "label CONTAINS 'Hila'")).firstMatch
+        XCTAssertTrue(hila.waitForExistence(timeout: 15))
+        hila.swipeRight()
+        let pin = app.buttons["Pin"]
+        XCTAssertTrue(pin.waitForExistence(timeout: 5))
+        pin.tap()
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label ==[c] 'Pinned'")).firstMatch
+            .waitForExistence(timeout: 5))
+        pause(1)
+        snap("10-2 Pinned to the top")
+
+        app.cells.containing(NSPredicate(format: "label CONTAINS 'Hila'")).firstMatch.tap()
+        let more = app.buttons["More"]
+        XCTAssertTrue(more.waitForExistence(timeout: 10))
+        more.tap()
+        let report = app.buttons["Report or block"]
+        XCTAssertTrue(report.waitForExistence(timeout: 5))
+        report.tap()
+        let harassment = app.buttons["Harassment or threats"]
+        XCTAssertTrue(harassment.waitForExistence(timeout: 5))
+        harassment.tap()
+        app.buttons["Submit"].tap()
+
+        let received = app.descendants(matching: .any)["report.received"]
+        XCTAssertTrue(received.waitForExistence(timeout: 10))
+        XCTAssertTrue(text(app, containing: "won't see or reach each other").exists)
+        snap("10-3 Report received: shield")
+        app.buttons["report.done"].tap()
+        XCTAssertTrue(waitUntilGone(received, timeout: 5))
     }
 
     // A -> G: the three ways to add a moment, from the profile's Add button.

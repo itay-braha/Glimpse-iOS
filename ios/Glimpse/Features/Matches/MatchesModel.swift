@@ -10,15 +10,20 @@ final class MatchesModel {
     private(set) var likesTotal = 0
     private(set) var secondChances: [SecondChance] = []
     private(set) var missedCount = 0
+    private(set) var pinned: Set<UUID> = []
     private(set) var isLoading = false
     private(set) var hasLoaded = false
     var errorMessage: String?
 
-    static let cap = 20
+    static let cap = 15
 
     var atCapacity: Bool { matches.count >= Self.cap }
-    var newMatches: [MatchSummary] { matches.filter { $0.messageCount == 0 } }
-    var conversations: [MatchSummary] { matches.filter { $0.messageCount > 0 } }
+    /// Pinned conversations sit above everything else.
+    var pinnedMatches: [MatchSummary] { matches.filter { pinned.contains($0.matchID) } }
+    var newMatches: [MatchSummary] { matches.filter { $0.messageCount == 0 && !pinned.contains($0.matchID) } }
+    var conversations: [MatchSummary] { matches.filter { $0.messageCount > 0 && !pinned.contains($0.matchID) } }
+
+    func isPinned(_ match: MatchSummary) -> Bool { pinned.contains(match.matchID) }
 
     func load(using backend: any GlimpseBackend) async {
         isLoading = true
@@ -33,6 +38,7 @@ final class MatchesModel {
                 avatarURLs.merge(await backend.mediaURLs(for: paths)) { _, new in new }
             }
             matches = fresh
+            pinned = (try? await backend.pinnedMatchIDs()) ?? pinned
             errorMessage = nil
             notices = ((try? await backend.notifications()) ?? [])
                 .filter { $0.readAt == nil && $0.kind == .connectionEnded }
@@ -58,7 +64,18 @@ final class MatchesModel {
         await load(using: backend)
     }
 
-    /// Accepting re-creates the match (the 20-cap still applies).
+    func togglePin(_ match: MatchSummary, using backend: any GlimpseBackend) async {
+        let pin = !isPinned(match)
+        do {
+            try await backend.setPinned(match.matchID, pinned: pin)
+            if pin { pinned.insert(match.matchID) } else { pinned.remove(match.matchID) }
+            errorMessage = nil
+        } catch {
+            errorMessage = GlimpseError.describe(error)
+        }
+    }
+
+    /// Accepting re-creates the match (the 15-cap still applies).
     func respond(to request: SecondChance, accept: Bool, using backend: any GlimpseBackend) async -> MatchSummary? {
         do {
             let result = try await backend.respondToSecondChance(request.id, accept: accept)

@@ -21,10 +21,16 @@ final class WebRTCClient: NSObject, RTCPeerConnectionDelegate, @unchecked Sendab
         get { frameTap.onFrame }
         set { frameTap.onFrame = newValue }
     }
+    /// Every decoded frame the other phone sends (for the backup safety copy).
+    var onRemoteFrame: (@Sendable (RTCVideoFrame) -> Void)? {
+        get { remoteTap.onFrame }
+        set { remoteTap.onFrame = newValue }
+    }
 
     private let peerConnection: RTCPeerConnection
     private let capturer: RTCCameraVideoCapturer
     private let frameTap: FrameTap
+    private let remoteTap = RemoteFrameTap()
     private let localVideoTrack: RTCVideoTrack
     private let localAudioTrack: RTCAudioTrack
     private var remoteVideoTrack: RTCVideoTrack?
@@ -164,6 +170,7 @@ final class WebRTCClient: NSObject, RTCPeerConnectionDelegate, @unchecked Sendab
         if let renderer {
             track.add(renderer)
         }
+        track.add(remoteTap)
         onRemoteVideo?()
     }
 
@@ -206,6 +213,17 @@ final class WebRTCClient: NSObject, RTCPeerConnectionDelegate, @unchecked Sendab
         if let track = transceiver.receiver.track as? RTCVideoTrack {
             adoptRemoteTrack(track)
         }
+    }
+}
+
+/// Receives the other phone's decoded frames for the backup safety copy.
+private final class RemoteFrameTap: NSObject, RTCVideoRenderer, @unchecked Sendable {
+    var onFrame: (@Sendable (RTCVideoFrame) -> Void)?
+
+    func setSize(_ size: CGSize) {}
+
+    func renderFrame(_ frame: RTCVideoFrame?) {
+        if let frame { onFrame?(frame) }
     }
 }
 

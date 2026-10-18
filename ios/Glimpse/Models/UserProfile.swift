@@ -19,6 +19,12 @@ struct UserProfile: Codable, Identifiable, Hashable, Sendable {
     var flexibleDiscovery: Bool?
     /// What buzzes the phone (all / messages / none).
     var pushScope: PushScope?
+    /// Alerts added on top of "Just messages" (e.g. Vibe Check reminders).
+    var pushExtras: [AlertExtra]?
+    /// Opt-in: pseudonymous activity may train Glimpse's matching and safety models.
+    var consentAiTraining: Bool?
+    /// Opt-in: aggregate statistics (groups of 20+) may be shared outside Glimpse.
+    var consentDataSharing: Bool?
 
     var age: Int? {
         guard let date = BirthdateFormat.date(from: birthdate) else { return nil }
@@ -41,5 +47,8 @@ struct UserProfile: Codable, Identifiable, Hashable, Sendable {
         case verificationStatus = "verification_status"
         case flexibleDiscovery = "flexible_discovery"
         case pushScope = "push_scope"
+        case pushExtras = "push_extras"
+        case consentAiTraining = "consent_ai_training"
+        case consentDataSharing = "consent_data_sharing"
     }
 }

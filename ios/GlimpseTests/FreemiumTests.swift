@@ -35,29 +35,22 @@ struct FreemiumTests {
         #expect(try await backend.likeQuota().remaining == 20)
     }
 
-    @Test func likedYouRevealsOnePersonPerDayForFree() async throws {
+    @Test func likedYouIsFreeForEveryone() async throws {
         let backend = DemoBackend(seeded: true)
-        let before = try await backend.likesReceived()
-        #expect(before.total == DemoData.admirers().count)
-        #expect(before.items.allSatisfy { !$0.revealed && $0.profile == nil })
-
-        let revealed = try await backend.revealLike()
-        #expect(revealed != nil)
-        await #expect(throws: GlimpseError.revealLimit) {
-            try await backend.revealLike()
-        }
-        #expect(try await backend.likesReceived().items.filter(\.revealed).count == 1)
+        let likes = try await backend.likesReceived()
+        #expect(!likes.isPlus)
+        #expect(likes.total == DemoData.admirers().count)
+        #expect(likes.items.allSatisfy { $0.revealed && $0.profile != nil })
     }
 
-    @Test func plusUnlocksEverything() async throws {
+    @Test func plusDoesNotBuyMoreLikes() async throws {
         let backend = DemoBackend(seeded: true)
         #expect(try await backend.verifyPurchase(signedTransaction: "demo"))
-        let likes = try await backend.likesReceived()
-        #expect(likes.isPlus)
-        #expect(likes.items.allSatisfy { $0.revealed && $0.profile != nil })
-        for _ in 0..<25 {
+        for _ in 0..<20 {
             _ = try await backend.swipe(on: UUID(), liked: true)
         }
-        #expect(try await backend.likeQuota().remaining > 0)
+        let quota = try await backend.likeQuota()
+        #expect(quota.allowance == 20)
+        #expect(quota.remaining == 0)
     }
 }

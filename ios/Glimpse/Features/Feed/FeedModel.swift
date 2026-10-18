@@ -41,7 +41,7 @@ final class FeedModel {
 
     /// How many profiles ahead are prepared: hosted clips cached, linked posts
     /// checked in the background (dead ones dropped before anyone sees them).
-    static let lookahead = 5
+    static let lookahead = 3
     /// Linked-post players warmed ahead (each is a live web view).
     static let embedLookahead = 3
 
@@ -229,7 +229,7 @@ final class FeedModel {
         }
     }
 
-    /// Prepares the next profiles: the cover clip of the next 5 and every hosted
+    /// Prepares the next profiles: the cover clip of the next 3 and every hosted
     /// clip of the next 2 go into the video cache; linked posts of the next 3 get
     /// a player warmed (and checked) in the background.
     private func prepare(from start: Int, using backend: any GlimpseBackend) {

@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UIKit
 
 enum AppTab: Hashable {
     case discover
@@ -9,9 +10,7 @@ enum AppTab: Hashable {
 
 /// Why the Glimpse+ paywall is being shown (drives its headline).
 enum PaywallReason: String, Identifiable {
-    case outOfLikes
     case outOfViews
-    case likedYou
     case freeze
     case secondChance
     case settings
@@ -49,6 +48,9 @@ final class AppModel {
     var showLikesYou = false
     /// Glimpse's own alerts choice, shown once before iOS's permission prompt.
     var askForAlerts = false
+    /// A rare, in-context offer to turn on one kind of alert.
+    var alertNudge: AlertNudge?
+    private let nudges = AlertNudges()
     let store = StoreManager()
     private var readyTasksStarted = false
 
@@ -158,9 +160,14 @@ final class AppModel {
             askForAlerts = true
             return
         }
+        if launch.screen == .alertNudge {
+            alertNudge = AlertNudge(topic: .vibeCheck, name: "Maya")
+            return
+        }
         guard launch.screen == nil else { return } // keep scripted screenshot runs prompt-free
         if await PushNotifications.shared.needsToAsk() {
-            askForAlerts = true
+            // Asked once. After that, only rare in-context offers (see offerAlerts).
+            if !nudges.hasMadeFirstChoice { askForAlerts = true }
         } else {
             await PushNotifications.shared.requestAuthorizationAndRegister()
         }
@@ -175,13 +182,66 @@ final class AppModel {
         try? await backend.setPushScope(scope)
     }
 
+    func setDataConsent(aiTraining: Bool, sharing: Bool) async {
+        profile?.consentAiTraining = aiTraining
+        profile?.consentDataSharing = sharing
+        try? await backend.setDataConsent(aiTraining: aiTraining, sharing: sharing)
+    }
+
     /// From the alerts sheet: remember the choice, then (if any) iOS's own prompt.
     func choseAlerts(_ scope: PushScope?) async {
         askForAlerts = false
+        nudges.recordFirstChoice()
         guard let scope else { return }
         await setPushScope(scope)
         await PushNotifications.shared.requestAuthorizationAndRegister()
         track("alerts_chosen", ["scope": scope.rawValue])
+    }
+
+    func setPushExtras(_ extras: [AlertExtra]) async {
+        profile?.pushExtras = extras
+        try? await backend.setPushExtras(extras)
+    }
+
+    /// Offers one kind of alert at the moment it matters, only if it's off right
+    /// now and the pacing rules allow it. Most calls show nothing, on purpose.
+    func offerAlerts(_ topic: AlertNudge.Topic, name: String) async {
+        guard launch.screen == nil, alertNudge == nil, !askForAlerts, nudges.mayAsk(topic) else { return }
+        let scope = profile?.pushScope ?? .all
+        let extras = profile?.pushExtras ?? []
+        let authorized = await PushNotifications.shared.isAuthorized()
+        let relevant = switch topic {
+        case .vibeCheck: authorized && scope == .messages && !extras.contains(.vibeCheck)
+        case .newMatch: authorized && scope == .messages && !extras.contains(.newMatch)
+        case .replies: !authorized || scope == .none
+        }
+        guard relevant else { return }
+        nudges.recordAsked(topic)
+        alertNudge = AlertNudge(topic: topic, name: name)
+        track("alert_nudge_shown", ["topic": topic.rawValue])
+    }
+
+    func answerNudge(_ nudge: AlertNudge, accepted: Bool, never: Bool) async {
+        alertNudge = nil
+        nudges.recordAnswer(nudge.topic, accepted: accepted, never: never)
+        track("alert_nudge_answered", ["topic": nudge.topic.rawValue, "accepted": "\(accepted)", "never": "\(never)"])
+        guard accepted else { return }
+        if let extra = nudge.extra {
+            var extras = profile?.pushExtras ?? []
+            if !extras.contains(extra) { extras.append(extra) }
+            await setPushExtras(extras)
+            return
+        }
+        // Replies: alerts were off. Turn on messages, then iOS's own prompt
+        // (or iOS Settings, if alerts were switched off there).
+        if (profile?.pushScope ?? .all) == .none { await setPushScope(.messages) }
+        if await PushNotifications.shared.isDenied() {
+            if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                _ = await UIApplication.shared.open(url)
+            }
+        } else {
+            await PushNotifications.shared.requestAuthorizationAndRegister()
+        }
     }
 
     func handleNotificationTap(kind: String?, matchID: UUID?) {
