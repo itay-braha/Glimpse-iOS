@@ -9,6 +9,8 @@ struct ChatView: View {
     @State private var showExitSurvey = false
     @State private var showPropose = false
     @State private var showCall = false
+    @State private var videoCall: VideoCallLaunch?
+    @AppStorage("videoCalls.tipShown") private var videoCallsTipShown = false
     @State private var showVibeInfo = false
     @State private var friendlyFollowUp = false
     @State private var recorder = ChatMediaRecorder()
@@ -93,6 +95,22 @@ struct ChatView: View {
         }
         .background(Palette.midnight)
         .safeAreaInset(edge: .top) {
+            VStack(spacing: 0) {
+            if let call = model.calls?.activeCall, call.status == .ringing, call.callerID != myID, !model.hasEnded {
+                IncomingCallCard(
+                    name: model.match.displayName,
+                    onAnswer: {
+                        Task { videoCall = await model.answer(call, accept: true, using: app.backend) }
+                    },
+                    onDecline: {
+                        Task { _ = await model.answer(call, accept: false, using: app.backend) }
+                    }
+                )
+                .background(Palette.midnight)
+            } else if showVideoCallsTip {
+                VideoCallsTipCard(name: model.match.displayName) { videoCallsTipShown = true }
+                    .background(Palette.midnight)
+            }
             if let vibe = model.vibe, !model.hasEnded {
                 VibeCheckBanner(
                     state: vibe,
@@ -128,6 +146,7 @@ struct ChatView: View {
                 .padding(.bottom, 6)
                 .background(Palette.midnight)
             }
+            }
         }
         .safeAreaInset(edge: .bottom) { composer }
         .navigationBarTitleDisplayMode(.inline)
@@ -154,8 +173,18 @@ struct ChatView: View {
                 }
                 .accessibilityElement(children: .combine)
             }
+            if let calls = model.calls, calls.available, !model.hasEnded {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Video call", systemImage: "video.fill") {
+                        Task { await startVideoCall(calls) }
+                    }
+                    .tint(Palette.mint)
+                    .accessibilityIdentifier("chat.videoCall")
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu("More", systemImage: "ellipsis.circle") {
+                    videoCallMenu
                     Button(model.isFrozen ? "Unfreeze" : "Freeze connection", systemImage: "snowflake") {
                         Task {
                             do {
@@ -232,6 +261,19 @@ struct ChatView: View {
                     }
                     app.track("vibe_proposed")
                     await app.offerAlerts(.vibeCheck, name: model.match.displayName)
+                }
+            }
+        }
+        .task { await model.watchCalls(using: app.backend) }
+        .fullScreenCover(item: $videoCall, onDismiss: {
+            Task { await model.refreshCalls(using: app.backend) }
+        }) { launch in
+            if let myID {
+                VibeCallView(
+                    match: model.match, myID: myID, backend: app.backend,
+                    kind: .videoCall(launch.callID), recordingAgreed: launch.recordingAgreed
+                ) { outcome in
+                    if outcome == .report { showReport = true }
                 }
             }
         }
@@ -423,6 +465,48 @@ struct ChatView: View {
             return "When the conversation is flowing, you can invite \(model.match.displayName) to a 3-minute video chat, or give the green light for them to suggest a time. It ends on its own after 3 minutes."
         }
         return "Vibe Checks unlock when the conversation flows naturally."
+    }
+
+    // MARK: Video calls
+
+    /// One-time pointer to Settings for whoever decides on video calls here.
+    private var showVideoCallsTip: Bool {
+        guard !videoCallsTipShown, !model.hasEnded, let calls = model.calls else { return false }
+        return calls.iHoldKey && !calls.myGlobalEnabled && calls.reason == .notEnabled
+    }
+
+    private func startVideoCall(_ calls: VideoCallState) async {
+        guard calls.canRing else {
+            if let next = calls.ringAvailableAt {
+                model.errorMessage = "You can call again \(next.formatted(.relative(presentation: .named)))."
+            } else if calls.callsToday >= calls.callsPerDay {
+                model.errorMessage = "That's today's \(calls.callsPerDay) calls. More tomorrow."
+            }
+            return
+        }
+        app.track("video_call_started")
+        videoCall = await model.ring(using: app.backend)
+    }
+
+    /// Per-match switches, in the chat's "More" menu: allow (whoever holds the key,
+    /// once video calls are on in Settings) and block (anyone, any time).
+    @ViewBuilder
+    private var videoCallMenu: some View {
+        if let calls = model.calls, calls.isRelevant || calls.blockedByMe {
+            Section("Video calls") {
+                if calls.iHoldKey && calls.myGlobalEnabled && !calls.blockedByMe {
+                    Button(calls.iAllowed ? "Stop video calls with \(model.match.displayName)" : "Allow video calls with \(model.match.displayName)",
+                           systemImage: calls.iAllowed ? "video.slash" : "video.badge.checkmark") {
+                        Task { await model.setCallsAllowed(!calls.iAllowed, using: app.backend) }
+                    }
+                }
+                Button(calls.blockedByMe ? "Unblock video calls" : "Block video calls",
+                       systemImage: calls.blockedByMe ? "video" : "video.slash.fill",
+                       role: calls.blockedByMe ? nil : .destructive) {
+                    Task { await model.setCallsBlocked(!calls.blockedByMe, using: app.backend) }
+                }
+            }
+        }
     }
 
     private func handleVibeOutcome(_ outcome: VibeOutcome?) {

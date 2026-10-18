@@ -12,6 +12,8 @@ final class ChatModel {
     private(set) var isLoading = true
     private(set) var hasEnded = false
     private(set) var vibe: VibeCheckState?
+    /// Video calls in this match (after a good Vibe Check).
+    private(set) var calls: VideoCallState?
     private(set) var isFrozen: Bool
     var draft = ""
     /// The message being answered (swipe a bubble, or "Reply" in its menu).
@@ -195,6 +197,63 @@ final class ChatModel {
         } catch {
             errorMessage = GlimpseError.describe(error)
         }
+    }
+
+    // MARK: Video calls
+
+    /// Keeps the call state fresh while the chat is open (incoming rings show up here),
+    /// quickly once calls are possible, rarely otherwise.
+    func watchCalls(using backend: any GlimpseBackend) async {
+        while !Task.isCancelled {
+            await refreshCalls(using: backend)
+            let relevant = calls?.isRelevant == true && !hasEnded
+            try? await Task.sleep(for: .seconds(relevant ? 3 : 30))
+        }
+    }
+
+    func refreshCalls(using backend: any GlimpseBackend) async {
+        if let fresh = try? await backend.videoCallState(matchID: match.matchID) {
+            calls = fresh
+        }
+    }
+
+    /// Rings the other person; returns what the call screen needs.
+    func ring(using backend: any GlimpseBackend) async -> VideoCallLaunch? {
+        do {
+            let id = try await backend.ringVideoCall(matchID: match.matchID)
+            await refreshCalls(using: backend)
+            return VideoCallLaunch(callID: id, recordingAgreed: calls?.recordingAgreed ?? false)
+        } catch {
+            errorMessage = GlimpseError.describe(error)
+            return nil
+        }
+    }
+
+    func answer(_ call: VideoCall, accept: Bool, using backend: any GlimpseBackend) async -> VideoCallLaunch? {
+        do {
+            let clock = try await backend.answerVideoCall(callID: call.id, accept: accept)
+            await refreshCalls(using: backend)
+            guard accept, clock != nil else { return nil }
+            return VideoCallLaunch(callID: call.id, recordingAgreed: calls?.recordingAgreed ?? false)
+        } catch {
+            errorMessage = GlimpseError.describe(error)
+            await refreshCalls(using: backend)
+            return nil
+        }
+    }
+
+    func setCallsAllowed(_ allowed: Bool, using backend: any GlimpseBackend) async {
+        do {
+            try await backend.setMatchVideoCalls(matchID: match.matchID, allowed: allowed)
+        } catch {
+            errorMessage = GlimpseError.describe(error)
+        }
+        await refreshCalls(using: backend)
+    }
+
+    func setCallsBlocked(_ blocked: Bool, using backend: any GlimpseBackend) async {
+        try? await backend.blockMatchVideoCalls(matchID: match.matchID, blocked: blocked)
+        await refreshCalls(using: backend)
     }
 
     // MARK: Vibe Check

@@ -41,6 +41,8 @@ struct AlertNudgeSheet: View {
         .padding(24)
         .presentationDetents([.height(400)])
         .presentationBackground(Palette.midnight)
+        // A container, so the buttons keep their own identifiers.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("nudge.\(nudge.topic.rawValue)")
     }
 }

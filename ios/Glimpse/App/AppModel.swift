@@ -69,10 +69,10 @@ final class AppModel {
             backend = SupabaseBackend(config: config)
         } else {
             let seeded = launch.screen != nil && launch.screen != .welcome
-            backend = DemoBackend(seeded: seeded, withVideos: launch.screen != .firstVideo)
+            backend = DemoBackend(seeded: seeded, withVideos: launch.screen != .firstVideo, videoCalls: launch.screen == .videoCall)
         }
         switch launch.screen {
-        case .connections, .chat: selectedTab = .connections
+        case .connections, .chat, .videoCall: selectedTab = .connections
         case .likes:
             selectedTab = .connections
             showLikesYou = true
@@ -184,6 +184,12 @@ final class AppModel {
         try? await backend.setPushScope(scope)
     }
 
+    func setVideoCallsEnabled(_ enabled: Bool) async {
+        profile?.videoCallsEnabled = enabled
+        try? await backend.setVideoCallsEnabled(enabled)
+        track("video_calls_setting", ["enabled": "\(enabled)"])
+    }
+
     func setDataConsent(aiTraining: Bool, sharing: Bool) async {
         profile?.consentAiTraining = aiTraining
         profile?.consentDataSharing = sharing
@@ -286,7 +292,7 @@ final class AppModel {
 
     /// For `-screen chat` launches: opens the most recent conversation once.
     func openLaunchChatIfNeeded(from conversations: [MatchSummary]) {
-        guard launch.screen == .chat, !launchChatConsumed, let first = conversations.first else { return }
+        guard launch.screen == .chat || launch.screen == .videoCall, !launchChatConsumed, let first = conversations.first else { return }
         launchChatConsumed = true
         connectionsPath = [first]
     }

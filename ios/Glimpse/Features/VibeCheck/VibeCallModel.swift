@@ -2,11 +2,18 @@ import AVFoundation
 import Observation
 import UIKit
 
-/// Drives one 3-Minute Vibe Check: lobby -> both ready -> peer connection ->
-/// hard stop at 00:00 (anchored on server time) -> private survey.
+/// Drives one call: lobby -> both ready -> peer connection -> hard stop at 00:00
+/// (anchored on server time). A 3-Minute Vibe Check ends in a private survey; a
+/// video call (up to 15 minutes, after a good Vibe Check) just ends.
 @MainActor
 @Observable
 final class VibeCallModel {
+    enum Kind: Equatable {
+        case vibeCheck
+        /// A ringing or live video call.
+        case videoCall(UUID)
+    }
+
     enum Phase: Equatable {
         case preparing
         case lobby
@@ -28,6 +35,7 @@ final class VibeCallModel {
     ]
 
     let match: MatchSummary
+    let kind: Kind
     private(set) var phase: Phase = .preparing
     private(set) var meReady = false
     private(set) var otherReady = false
@@ -61,11 +69,31 @@ final class VibeCallModel {
     /// The participant with the lower id creates the offer, so exactly one side does.
     private var isOfferer: Bool { myID < match.otherUserID.uuidString.lowercased() }
 
-    init(match: MatchSummary, myID: UUID, backend: any GlimpseBackend) {
+    var callID: UUID? {
+        switch kind {
+        case let .videoCall(id): id
+        case .vibeCheck: nil
+        }
+    }
+
+    var isVideoCall: Bool { callID != nil }
+
+    /// Call length: 3 minutes for a Vibe Check, up to 15 for a video call.
+    var totalSeconds: Int { isVideoCall ? 15 * 60 : 180 }
+
+    private var watchTask: Task<Void, Never>?
+
+    /// - Parameter recordingAgreed: for video calls, the safety recording is agreed once per match.
+    init(match: MatchSummary, myID: UUID, backend: any GlimpseBackend, kind: Kind = .vibeCheck, recordingAgreed: Bool = false) {
         self.match = match
+        self.kind = kind
         self.myID = myID.uuidString.lowercased()
         self.backend = backend
         icebreakerIndex = Int.random(in: 0..<Self.icebreakers.count)
+        if case .videoCall = kind {
+            secondsLeft = 15 * 60
+            agreedToSafetyRecording = recordingAgreed
+        }
     }
 
     var clockText: String {
@@ -105,12 +133,49 @@ final class VibeCallModel {
         }
         observeScreenshots()
         phase = .lobby
+        if isVideoCall {
+            watchCall()
+            // Agreed before with this match: straight in, like a phone call.
+            if agreedToSafetyRecording { markReady() }
+        }
+    }
+
+    /// While a video call is ringing or live, notices if the other side declined,
+    /// missed it, blocked calls or hung up from another screen.
+    private func watchCall() {
+        guard let callID else { return }
+        let matchID = match.matchID
+        let name = match.displayName
+        watchTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(2))
+                guard let self, self.phase != .ended else { return }
+                guard let state = try? await self.backend.videoCallState(matchID: matchID) else { continue }
+                if state.activeCall?.id != callID {
+                    if self.phase == .live {
+                        self.end(sendHangup: false)
+                    } else {
+                        self.fail("\(name) can't talk right now.")
+                    }
+                    return
+                }
+            }
+        }
+    }
+
+    private func fail(_ message: String) {
+        end(sendHangup: false)
+        phase = .failed(message)
     }
 
     /// "I'm ready": announced until the other side answers, so late joiners still see it.
     func markReady() {
         guard !meReady, agreedToSafetyRecording else { return }
         meReady = true
+        if isVideoCall {
+            let matchID = match.matchID
+            Task { try? await backend.agreeVideoCallRecording(matchID: matchID) }
+        }
         readyPingTask = Task { [weak self] in
             while let self, !Task.isCancelled, !self.otherReady || !self.offerSent && self.isOfferer {
                 await self.send(VibeSignal(kind: .ready, sender: ""))
@@ -124,6 +189,11 @@ final class VibeCallModel {
     func end(sendHangup: Bool = true) {
         guard phase != .ended else { return }
         phase = .ended
+        watchTask?.cancel()
+        if let callID {
+            let backend = backend
+            Task { await backend.endVideoCall(callID: callID) }
+        }
         clockTask?.cancel()
         readyPingTask?.cancel()
         listenTask?.cancel()
@@ -232,12 +302,17 @@ final class VibeCallModel {
         readyPingTask?.cancel()
         startRecording()
         do {
-            let clock = try await backend.vibeMarkStarted(matchID: match.matchID)
+            let clock: VibeClock
+            if let callID {
+                clock = try await backend.videoCallClock(callID: callID)
+            } else {
+                clock = try await backend.vibeMarkStarted(matchID: match.matchID)
+            }
             // Translate the server's end time into local time (clock skew safe).
             let skew = clock.serverNow.timeIntervalSinceNow
             endsAt = clock.endsAt.addingTimeInterval(-skew)
         } catch {
-            endsAt = Date.now.addingTimeInterval(180)
+            endsAt = Date.now.addingTimeInterval(Double(totalSeconds))
         }
         startClock()
     }
@@ -305,10 +380,11 @@ final class VibeCallModel {
     private func startRecording() {
         guard let client, recorders.isEmpty else { return }
         let matchID = match.matchID
+        let callID = callID
         let backend = backend
         let deliver: @Sendable (VibeSafetyRecorder.Segment) -> Void = { segment in
             Task { @MainActor in
-                VibeRecordingUploads.enqueue(segment, matchID: matchID)
+                VibeRecordingUploads.enqueue(segment, matchID: matchID, callID: callID)
                 if segment.stream == .own {
                     await VibeRecordingUploads.uploadPending(using: backend)
                 }

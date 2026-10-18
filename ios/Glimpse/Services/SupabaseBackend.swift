@@ -307,6 +307,8 @@ final class SupabaseBackend: GlimpseBackend {
             case ("GL402", "freeze_limit"): throw GlimpseError.freezeLimit
             case ("GL402", "pin_limit"): throw GlimpseError.pinLimit
             case ("GL402", "gold_required"): throw GlimpseError.goldRequired
+            case ("GL402", "ring_limit"): throw GlimpseError.ringLimit
+            case ("GL402", "video_calls_off"): throw GlimpseError.videoCallsOff
             case ("GL402", "spotlight_used"): throw GlimpseError.spotlightUsed
             case ("GL402", "rewind_limit"): throw GlimpseError.rewindLimit
             case ("GL402", "city_not_open"): throw GlimpseError.cityNotOpen
@@ -591,20 +593,80 @@ final class SupabaseBackend: GlimpseBackend {
     // MARK: 3-Minute Vibe Check
 
     func uploadVibeSegment(
-        matchID: UUID, fileURL: URL, startedAt: Date, part: Int, duration: Double?, received: Bool
+        matchID: UUID, callID: UUID?, fileURL: URL, startedAt: Date, part: Int, duration: Double?, received: Bool
     ) async throws {
         let bytes = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? nil
         let path = try await upload(fileURL: fileURL, kind: "vibe", ext: "mp4", bytes: bytes, limit: 40 * 1024 * 1024)
-        try await client.rpc(
-            "vibe_register_segment",
-            params: VibeSegmentParams(
-                match: matchID, path: path, startedAt: startedAt, part: part, duration: duration, received: received
-            )
-        ).execute()
+        if let callID {
+            try await client.rpc(
+                "call_register_segment",
+                params: CallSegmentParams(
+                    call: callID, path: path, startedAt: startedAt, part: part, duration: duration, received: received
+                )
+            ).execute()
+        } else {
+            try await client.rpc(
+                "vibe_register_segment",
+                params: VibeSegmentParams(
+                    match: matchID, path: path, startedAt: startedAt, part: part, duration: duration, received: received
+                )
+            ).execute()
+        }
     }
 
-    func vibeBackupDecision(matchID: UUID) async throws -> VibeBackupDecision {
-        try await client.rpc("vibe_backup_decision", params: ["p_match": matchID]).execute().value
+    func vibeBackupDecision(matchID: UUID, callID: UUID?) async throws -> VibeBackupDecision {
+        if let callID {
+            return try await client.rpc("call_backup_decision", params: ["p_call": callID]).execute().value
+        }
+        return try await client.rpc("vibe_backup_decision", params: ["p_match": matchID]).execute().value
+    }
+
+    // MARK: Video calls
+
+    func videoCallState(matchID: UUID) async throws -> VideoCallState {
+        try await client.rpc("get_video_calls", params: ["p_match": matchID]).execute().value
+    }
+
+    func setVideoCallsEnabled(_ enabled: Bool) async throws {
+        try await client.from("profiles")
+            .update(["video_calls_enabled": enabled])
+            .eq("id", value: currentUserKey())
+            .execute()
+    }
+
+    func setMatchVideoCalls(matchID: UUID, allowed: Bool) async throws {
+        try await mapLimits {
+            try await client.rpc("set_match_video_calls", params: MatchFlagParams(match: matchID, flag: allowed, key: "p_allowed")).execute()
+        }
+    }
+
+    func blockMatchVideoCalls(matchID: UUID, blocked: Bool) async throws {
+        try await client.rpc("block_match_video_calls", params: MatchFlagParams(match: matchID, flag: blocked, key: "p_blocked")).execute()
+    }
+
+    func agreeVideoCallRecording(matchID: UUID) async throws {
+        try await client.rpc("agree_video_call_recording", params: ["p_match": matchID]).execute()
+    }
+
+    func ringVideoCall(matchID: UUID) async throws -> UUID {
+        try await mapLimits { () async throws -> UUID in
+            try await client.rpc("ring_video_call", params: ["p_match": matchID]).execute().value
+        }
+    }
+
+    func answerVideoCall(callID: UUID, accept: Bool) async throws -> VibeClock? {
+        let response = try await client.rpc("answer_video_call", params: AnswerCallParams(call: callID, accept: accept)).execute()
+        let text = String(decoding: response.data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, text != "null" else { return nil }
+        return try JSONDecoder.glimpse().decode(VibeClock.self, from: response.data)
+    }
+
+    func videoCallClock(callID: UUID) async throws -> VibeClock {
+        try await client.rpc("video_call_clock", params: ["p_call": callID]).execute().value
+    }
+
+    func endVideoCall(callID: UUID) async {
+        _ = try? await client.rpc("end_video_call", params: ["p_call": callID]).execute()
     }
 
     func logVibeCapture(matchID: UUID, kind: String) async {
@@ -985,6 +1047,55 @@ private struct IceServersResponse: Decodable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case iceServers = "ice_servers"
+    }
+}
+
+private struct CallSegmentParams: Encodable, Sendable {
+    let call: UUID
+    let path: String
+    let startedAt: Date
+    let part: Int
+    let duration: Double?
+    let received: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case call = "p_call"
+        case path = "p_path"
+        case startedAt = "p_started_at"
+        case part = "p_part"
+        case duration = "p_duration"
+        case received = "p_received"
+    }
+}
+
+/// `{p_match, <key>}` for the match-level video call switches.
+private struct MatchFlagParams: Encodable, Sendable {
+    let match: UUID
+    let flag: Bool
+    let key: String
+
+    private struct Key: CodingKey {
+        var stringValue: String
+        var intValue: Int? { nil }
+        init(_ string: String) { stringValue = string }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { nil }
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: Key.self)
+        try container.encode(match, forKey: Key("p_match"))
+        try container.encode(flag, forKey: Key(key))
+    }
+}
+
+private struct AnswerCallParams: Encodable, Sendable {
+    let call: UUID
+    let accept: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case call = "p_call"
+        case accept = "p_accept"
     }
 }
 

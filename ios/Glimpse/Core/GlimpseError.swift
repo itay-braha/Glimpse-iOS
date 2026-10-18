@@ -32,6 +32,8 @@ enum GlimpseError: LocalizedError, Equatable {
     case freezeLimit
     case pinLimit
     case goldRequired
+    case ringLimit
+    case videoCallsOff
     case spotlightUsed
     case rewindLimit
     case cityNotOpen
@@ -61,6 +63,8 @@ enum GlimpseError: LocalizedError, Equatable {
         case .freezeLimit: "You've used your free freeze. Glimpse+ protects up to 3 connections."
         case .pinLimit: "You can pin up to 3 conversations. Unpin one first."
         case .goldRequired: "That's part of Glimpse Gold."
+        case .ringLimit: "Give it a little time before calling again."
+        case .videoCallsOff: "Turn on video calls in Settings first."
         case .spotlightUsed: "Your next Spotlight is ready a week after the last one."
         case .rewindLimit: "You've used today's 5 rewinds."
         case .cityNotOpen: "Glimpse isn't open in that city yet."

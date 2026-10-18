@@ -10,8 +10,14 @@ struct VibeCallView: View {
     /// Called after the survey with the chosen outcome.
     let onFinished: (VibeOutcome?) -> Void
 
-    init(match: MatchSummary, myID: UUID, backend: any GlimpseBackend, onFinished: @escaping (VibeOutcome?) -> Void) {
-        _model = State(initialValue: VibeCallModel(match: match, myID: myID, backend: backend))
+    init(
+        match: MatchSummary, myID: UUID, backend: any GlimpseBackend,
+        kind: VibeCallModel.Kind = .vibeCheck, recordingAgreed: Bool = false,
+        onFinished: @escaping (VibeOutcome?) -> Void
+    ) {
+        _model = State(initialValue: VibeCallModel(
+            match: match, myID: myID, backend: backend, kind: kind, recordingAgreed: recordingAgreed
+        ))
         self.onFinished = onFinished
     }
 
@@ -28,6 +34,13 @@ struct VibeCallView: View {
                 lobby
             case .live:
                 live
+            case .ended where model.isVideoCall:
+                // Video calls just end; "End & report" goes straight to the report.
+                ProgressView().tint(.white)
+                    .task {
+                        onFinished(reportAfterEnd ? .report : nil)
+                        dismiss()
+                    }
             case .ended:
                 if showSurvey {
                     VibeSurveyView(name: model.match.displayName, startReport: reportAfterEnd) { outcome in
@@ -64,10 +77,13 @@ struct VibeCallView: View {
                 Spacer()
             }
 
-            Text("3-Minute Vibe Check")
+            Text(model.isVideoCall ? "Video call with \(model.match.displayName)" : "3-Minute Vibe Check")
                 .font(.glimpseTitle2)
                 .foregroundStyle(Palette.brandGradient)
-            Text("Check your camera and light. The call starts when you're both ready, and ends on its own after 3 minutes.")
+            Text(model.isVideoCall
+                 ? (model.meReady ? "Calling… it starts when \(model.match.displayName) joins, and ends on its own after 15 minutes."
+                                  : "Up to 15 minutes, and it ends on its own. Either of you can turn video calls off at any time.")
+                 : "Check your camera and light. The call starts when you're both ready, and ends on its own after 3 minutes.")
                 .font(.subheadline)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(Palette.textSecondary)
@@ -198,10 +214,14 @@ struct VibeCallView: View {
                 }
                 .padding(.horizontal, 16)
 
-                IcebreakerCard(text: VibeCallModel.icebreakers[model.icebreakerIndex]) {
-                    model.nextIcebreaker()
+                if model.isVideoCall {
+                    Color.clear.frame(height: 24)
+                } else {
+                    IcebreakerCard(text: VibeCallModel.icebreakers[model.icebreakerIndex]) {
+                        model.nextIcebreaker()
+                    }
+                    .padding(16)
                 }
-                .padding(16)
             }
         }
     }

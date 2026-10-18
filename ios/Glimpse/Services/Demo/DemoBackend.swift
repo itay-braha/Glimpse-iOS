@@ -28,6 +28,12 @@ actor DemoBackend: GlimpseBackend {
     private var passHistory: [UUID] = []
     private var rewindTimes: [Date] = []
     private var travel: (city: String, until: Date)?
+    private var activeCalls: [UUID: VideoCall] = [:]
+    private var callLog: [UUID: [Date]] = [:]
+    private var callsBlocked: Set<UUID> = []
+    private var callRecordingAgreed: Set<UUID> = []
+    /// `-screen videoCall`: every match is Vibe Verified and she has turned calls on.
+    private let demoVideoCalls: Bool
     private var likeTimes: [Date] = []
     private var admirers: [FeedProfile]
     private var notices: [AppNotification]
@@ -47,7 +53,8 @@ actor DemoBackend: GlimpseBackend {
 
     /// - Parameter seeded: start signed in with a complete profile and 15 matches.
     /// `withVideos: false` starts signed in but before the first moment (onboarding's video hub).
-    init(seeded: Bool = true, withVideos: Bool = true, now: Date = .now) {
+    init(seeded: Bool = true, withVideos: Bool = true, videoCalls: Bool = false, now: Date = .now) {
+        demoVideoCalls = videoCalls
         signedIn = seeded
         profile = seeded ? DemoData.myProfile() : nil
         videos = seeded && withVideos ? DemoData.myVideos(now: now) : []
@@ -635,10 +642,109 @@ actor DemoBackend: GlimpseBackend {
 
     /// Demo calls have no camera, so there's nothing to keep.
     func uploadVibeSegment(
-        matchID: UUID, fileURL: URL, startedAt: Date, part: Int, duration: Double?, received: Bool
+        matchID: UUID, callID: UUID?, fileURL: URL, startedAt: Date, part: Int, duration: Double?, received: Bool
     ) {}
 
-    func vibeBackupDecision(matchID: UUID) -> VibeBackupDecision { .discard }
+    func vibeBackupDecision(matchID: UUID, callID: UUID?) -> VibeBackupDecision { .discard }
+
+    // MARK: Video calls (demo: the demo user is a man, so she holds the key; her side
+    // turns calls on after a good Vibe Check, and his rings are answered a moment later)
+
+    private func isVibeVerified(_ matchID: UUID) -> Bool {
+        vibeStates[matchID]?.vibeVerified == true
+            || matches.first { $0.matchID == matchID }?.vibeVerified == true
+            || demoVideoCalls
+    }
+
+    func videoCallState(matchID: UUID) -> VideoCallState {
+        if let call = activeCalls[matchID], call.status == .live, let ends = call.endsAt, ends < .now {
+            activeCalls[matchID] = nil
+        }
+        let reason: VideoCallState.Reason? = !matches.contains { $0.matchID == matchID } ? .noMatch
+            : !isVibeVerified(matchID) ? .needsVibeCheck
+            : callsBlocked.contains(matchID) ? .blocked
+            : nil
+        let today = (callLog[matchID] ?? []).filter { Date.now.timeIntervalSince($0) < 86_400 }.count
+        return VideoCallState(
+            available: reason == nil,
+            reason: reason,
+            iHoldKey: false,
+            myGlobalEnabled: profile?.videoCallsEnabled ?? false,
+            iAllowed: false,
+            blockedByMe: callsBlocked.contains(matchID),
+            recordingAgreed: callRecordingAgreed.contains(matchID),
+            callsToday: today,
+            callsPerDay: 4,
+            ringAvailableAt: nil,
+            canRing: reason == nil && activeCalls[matchID] == nil && today < 4,
+            activeCall: activeCalls[matchID]
+        )
+    }
+
+    func setVideoCallsEnabled(_ enabled: Bool) {
+        profile?.videoCallsEnabled = enabled
+    }
+
+    func setMatchVideoCalls(matchID: UUID, allowed: Bool) throws {
+        // In the demo's woman-man matches the key is hers.
+        throw GlimpseError.message("In this match, video calls are \(matches.first { $0.matchID == matchID }?.displayName ?? "her")'s choice.")
+    }
+
+    func blockMatchVideoCalls(matchID: UUID, blocked: Bool) {
+        if blocked {
+            callsBlocked.insert(matchID)
+            activeCalls[matchID] = nil
+        } else {
+            callsBlocked.remove(matchID)
+        }
+    }
+
+    func agreeVideoCallRecording(matchID: UUID) {
+        callRecordingAgreed.insert(matchID)
+    }
+
+    func ringVideoCall(matchID: UUID) throws -> UUID {
+        let state = videoCallState(matchID: matchID)
+        guard state.available else { throw GlimpseError.message("Video calls aren't on in this conversation.") }
+        guard state.canRing else { throw GlimpseError.ringLimit }
+        let call = VideoCall(id: UUID(), status: .ringing, callerID: me, createdAt: .now, endsAt: nil)
+        activeCalls[matchID] = call
+        // She picks up a moment later.
+        Task {
+            try? await Task.sleep(for: .milliseconds(1_500))
+            self.demoPickUp(matchID, callID: call.id)
+        }
+        return call.id
+    }
+
+    private func demoPickUp(_ matchID: UUID, callID: UUID) {
+        guard activeCalls[matchID]?.id == callID, activeCalls[matchID]?.status == .ringing else { return }
+        activeCalls[matchID]?.status = .live
+        activeCalls[matchID]?.endsAt = Date.now.addingTimeInterval(15 * 60)
+        callLog[matchID, default: []].append(.now)
+    }
+
+    func answerVideoCall(callID: UUID, accept: Bool) -> VibeClock? {
+        guard let matchID = activeCalls.first(where: { $0.value.id == callID })?.key else { return nil }
+        guard accept else {
+            activeCalls[matchID] = nil
+            return nil
+        }
+        demoPickUp(matchID, callID: callID)
+        return videoCallClock(callID: callID)
+    }
+
+    func videoCallClock(callID: UUID) -> VibeClock {
+        let call = activeCalls.values.first { $0.id == callID }
+        let ends = call?.endsAt ?? Date.now.addingTimeInterval(15 * 60)
+        return VibeClock(startedAt: ends.addingTimeInterval(-15 * 60), endsAt: ends, serverNow: .now)
+    }
+
+    func endVideoCall(callID: UUID) {
+        if let matchID = activeCalls.first(where: { $0.value.id == callID })?.key {
+            activeCalls[matchID] = nil
+        }
+    }
 
     func logVibeCapture(matchID: UUID, kind: String) {}
 

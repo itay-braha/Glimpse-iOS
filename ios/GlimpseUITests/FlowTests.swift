@@ -240,6 +240,40 @@ final class FlowTests: XCTestCase {
         snap("11-4 Gold hub before upgrading")
     }
 
+    // After a good Vibe Check (and her yes): a 15-minute video call, blockable any time.
+    func testVideoCallAfterVibeCheck() {
+        let app = launch("videoCall")
+        let call = app.buttons["chat.videoCall"]
+        XCTAssertTrue(call.waitForExistence(timeout: 20))
+        snap("12-1 Video call, after a good Vibe Check")
+        call.tap()
+
+        let ready = app.buttons["I'm ready"]
+        XCTAssertTrue(ready.waitForExistence(timeout: 10))
+        let agree = app.switches["vibe.agree"]
+        XCTAssertTrue(agree.waitForExistence(timeout: 5))
+        agree.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
+        snap("12-2 First call with her: recording agreed once")
+        ready.tap()
+
+        let hangUp = app.buttons["Hang up"]
+        XCTAssertTrue(hangUp.waitForExistence(timeout: 15))
+        let clock = text(app, containing: "seconds left")
+        XCTAssertTrue(clock.waitForExistence(timeout: 5))
+        let seconds = Int(clock.label.prefix { $0.isNumber }) ?? 0
+        XCTAssertGreaterThan(seconds, 600, "the clock runs from 15 minutes")
+        snap("12-3 Live: up to 15 minutes")
+        hangUp.tap()
+
+        XCTAssertTrue(call.waitForExistence(timeout: 10))
+        app.buttons["More"].tap()
+        let block = app.buttons["Block video calls"]
+        XCTAssertTrue(block.waitForExistence(timeout: 5))
+        snap("12-4 Block video calls any time")
+        block.tap()
+        XCTAssertTrue(waitUntilGone(call, timeout: 10), "blocking removes the call button")
+    }
+
     // A rare alert offer, pinning a chat, and the report confirmation.
     func testPinsReportAndAlertOffer() {
         let app = launch("alertNudge")

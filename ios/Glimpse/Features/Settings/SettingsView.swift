@@ -140,6 +140,19 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Toggle("Video calls after a great Vibe Check", isOn: Binding(
+                        get: { app.profile?.videoCallsEnabled ?? false },
+                        set: { on in Task { await app.setVideoCallsEnabled(on) } }
+                    ))
+                    .tint(Palette.mint)
+                    .accessibilityIdentifier("settings.videoCalls")
+                } header: {
+                    Text("Video calls")
+                } footer: {
+                    Text("Off unless you turn it on. Then, only with someone you both felt good about in a Vibe Check, and only once you allow it in that chat (in a woman–man match, it's her choice). Calls last up to 15 minutes, can't be screenshotted or recorded, and either of you can block them at any time.")
+                }
+
+                Section {
                     Toggle("Help improve matching", isOn: Binding(
                         get: { app.profile?.consentAiTraining ?? false },
                         set: { on in

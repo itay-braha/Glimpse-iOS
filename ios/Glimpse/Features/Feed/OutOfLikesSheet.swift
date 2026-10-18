@@ -79,6 +79,7 @@ struct OutOfLikesSheet: View {
         .padding(24)
         .presentationDetents([.medium, .large])
         .presentationBackground(Palette.midnight)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("outOfLikes")
     }
 

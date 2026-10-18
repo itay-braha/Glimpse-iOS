@@ -239,16 +239,17 @@ enum VibeRecordingUploads {
         var part: Int?
         var duration: Double?
         var stream: VibeSafetyRecorder.Stream?
+        var callID: UUID?
     }
 
     private static let key = "glimpse.vibeUploads"
     private static var isUploading = false
 
-    static func enqueue(_ segment: VibeSafetyRecorder.Segment, matchID: UUID) {
+    static func enqueue(_ segment: VibeSafetyRecorder.Segment, matchID: UUID, callID: UUID? = nil) {
         var pending = load()
         pending.append(Pending(
             matchID: matchID, file: segment.url.lastPathComponent, startedAt: segment.startedAt,
-            part: segment.part, duration: segment.duration, stream: segment.stream
+            part: segment.part, duration: segment.duration, stream: segment.stream, callID: callID
         ))
         save(pending)
     }
@@ -258,7 +259,7 @@ enum VibeRecordingUploads {
         isUploading = true
         defer { isUploading = false }
 
-        var decisions: [UUID: VibeBackupDecision] = [:]
+        var decisions: [String: VibeBackupDecision] = [:]
         var done: Set<String> = []
         for item in load() {
             let url = VibeSafetyRecorder.directory.appending(path: item.file)
@@ -268,10 +269,11 @@ enum VibeRecordingUploads {
             }
             let received = item.stream == .received
             if received {
-                if decisions[item.matchID] == nil {
-                    decisions[item.matchID] = (try? await backend.vibeBackupDecision(matchID: item.matchID)) ?? .wait
+                let key = item.callID?.uuidString ?? item.matchID.uuidString
+                if decisions[key] == nil {
+                    decisions[key] = (try? await backend.vibeBackupDecision(matchID: item.matchID, callID: item.callID)) ?? .wait
                 }
-                switch decisions[item.matchID] ?? .wait {
+                switch decisions[key] ?? .wait {
                 case .discard:
                     try? FileManager.default.removeItem(at: url)
                     done.insert(item.file)
@@ -288,7 +290,7 @@ enum VibeRecordingUploads {
             }
             do {
                 try await backend.uploadVibeSegment(
-                    matchID: item.matchID, fileURL: url, startedAt: item.startedAt,
+                    matchID: item.matchID, callID: item.callID, fileURL: url, startedAt: item.startedAt,
                     part: item.part ?? 0, duration: item.duration, received: received
                 )
                 try? FileManager.default.removeItem(at: url)

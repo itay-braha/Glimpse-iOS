@@ -21,6 +21,8 @@ struct LaunchOptions: Sendable {
         case alerts
         /// The in-context Vibe Check alert offer (for screenshots).
         case alertNudge
+        /// A Vibe Verified chat where she has turned video calls on (demo).
+        case videoCall
     }
 
     var forceDemo = false
