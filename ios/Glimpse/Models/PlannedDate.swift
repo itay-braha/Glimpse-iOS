@@ -24,9 +24,12 @@ struct PlannedDate: Codable, Hashable, Identifiable, Sendable {
 
     var mapsLink: URL? {
         if let mapsURL, let url = URL(string: mapsURL) { return url }
-        guard let latitude, let longitude else { return nil }
-        var parts = URLComponents(string: "https://maps.apple.com/")
-        parts?.queryItems = [URLQueryItem(name: "q", value: place), URLQueryItem(name: "ll", value: "\(latitude),\(longitude)")]
+        // A general idea has no place to find; a venue gets a Google Maps search
+        // (opens the Google Maps app when installed).
+        guard latitude != nil else { return nil }
+        var parts = URLComponents(string: "https://www.google.com/maps/search/")
+        let query = "\(place) \(address ?? "")"
+        parts?.queryItems = [URLQueryItem(name: "api", value: "1"), URLQueryItem(name: "query", value: query)]
         return parts?.url
     }
 

@@ -46,17 +46,17 @@ struct DateSpot: Codable, Hashable, Identifiable, Sendable {
 
     var priceText: String? { priceLevel.map { String(repeating: "₪", count: $0) } }
 
-    /// The venue's own map link, or an Apple Maps search at the spot.
+    /// The venue's own map link, or a Google Maps search for it (opens the Google Maps
+    /// app when installed, the browser otherwise).
     var mapsLink: URL? {
-        mapsURL.flatMap { URL(string: $0) } ?? appleMapsURL
+        mapsURL.flatMap { URL(string: $0) } ?? googleMapsURL
     }
 
-    /// Apple Maps search at the spot (used when the venue gave no link).
-    var appleMapsURL: URL? {
-        var parts = URLComponents(string: "https://maps.apple.com/")
+    var googleMapsURL: URL? {
+        var parts = URLComponents(string: "https://www.google.com/maps/search/")
         parts?.queryItems = [
-            URLQueryItem(name: "q", value: name),
-            URLQueryItem(name: "ll", value: "\(latitude),\(longitude)"),
+            URLQueryItem(name: "api", value: "1"),
+            URLQueryItem(name: "query", value: [name, city].compactMap { $0 }.joined(separator: " ")),
         ]
         return parts?.url
     }

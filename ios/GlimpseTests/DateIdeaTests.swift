@@ -38,9 +38,10 @@ struct DateIdeaTests {
         #expect(topics.contains { $0.contains(match.city ?? "Tel Aviv") })
     }
 
-    @Test func spotLinksFallBackToAppleMaps() {
-        let spot = DateSpot(id: UUID(), name: "Lumen Café", category: .cafe, latitude: 32.07, longitude: 34.775)
-        #expect(spot.mapsLink?.host == "maps.apple.com")
+    @Test func spotLinksOpenGoogleMaps() {
+        let spot = DateSpot(id: UUID(), name: "Lumen Café", category: .cafe, city: "Tel Aviv", latitude: 32.07, longitude: 34.775)
+        #expect(spot.mapsLink?.host == "www.google.com")
+        #expect(spot.mapsLink?.absoluteString.contains("Lumen") == true)
     }
 }
 
