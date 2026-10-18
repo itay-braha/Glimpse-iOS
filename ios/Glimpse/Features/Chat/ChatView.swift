@@ -291,6 +291,13 @@ struct ChatView: View {
             }
         }
         .task { await model.refreshDateIdea(using: app.backend) }
+        // While a suggested date waits for an answer, check back every few seconds.
+        .task(id: model.plannedDate?.status) {
+            while model.plannedDate?.status == .proposed, !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(4))
+                await model.refreshDateIdea(using: app.backend)
+            }
+        }
         .sheet(isPresented: $showDatePlan) {
             DatePlanSheet(
                 place: model.dateIdea?.spot?.name ?? model.dateIdea?.idea ?? model.plannedDate?.place ?? "",
