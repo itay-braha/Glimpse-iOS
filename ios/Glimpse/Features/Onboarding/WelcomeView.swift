@@ -32,6 +32,8 @@ struct WelcomeView: View {
                               title: "15 connections, max", detail: "Quiet chats make room for new ones.")
                     ValueProp(symbol: "checkmark.shield.fill", tint: Color(hex: 0x7AF0FF),
                               title: "Verified humans", detail: "Real numbers, real devices, no catfish.")
+                    ValueProp(symbol: "eye.slash.fill", tint: Palette.violet,
+                              title: "Private by design", detail: "Screenshots and screen recordings of videos and calls are blocked, and not allowed.")
                 }
                 .padding(.vertical, 36)
 

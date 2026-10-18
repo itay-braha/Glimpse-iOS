@@ -3,23 +3,38 @@ import SwiftUI
 
 /// Full-bleed, seamlessly looping video. SwiftUI's `VideoPlayer` brings its own
 /// chrome and can't aspect-fill, so this wraps an `AVPlayerLayer` directly.
+/// Other people's videos play inside a `SecureCanvas`, so screenshots and screen
+/// recordings of them come out blank. `protected: false` is for your own recordings.
 struct LoopingVideoPlayer: UIViewRepresentable {
     let url: URL
     var isActive: Bool
     var isMuted = false
+    var protected = true
 
-    func makeUIView(context: Context) -> PlayerView {
-        PlayerView()
+    func makeUIView(context: Context) -> SecureCanvas {
+        let canvas = SecureCanvas(frame: .zero, protect: protected && SecureCanvas.protectsMedia)
+        let player = PlayerView()
+        canvas.embed(player)
+        context.coordinator.player = player
+        return canvas
     }
 
-    func updateUIView(_ view: PlayerView, context: Context) {
+    func updateUIView(_ canvas: SecureCanvas, context: Context) {
+        guard let view = context.coordinator.player else { return }
         view.load(url)
         view.player.isMuted = isMuted
         view.setPlaying(isActive)
     }
 
-    static func dismantleUIView(_ view: PlayerView, coordinator: ()) {
-        view.teardown()
+    static func dismantleUIView(_ canvas: SecureCanvas, coordinator: Coordinator) {
+        coordinator.player?.teardown()
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    @MainActor
+    final class Coordinator {
+        var player: PlayerView?
     }
 
     final class PlayerView: UIView {

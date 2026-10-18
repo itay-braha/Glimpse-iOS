@@ -74,7 +74,7 @@ struct UploadVideoView: View {
 
     private func reviewSection(_ review: UploadVideoModel.Review) -> some View {
         VStack(alignment: .leading, spacing: 18) {
-            LoopingVideoPlayer(url: review.fileURL, isActive: true, isMuted: preferences.isMuted)
+            LoopingVideoPlayer(url: review.fileURL, isActive: true, isMuted: preferences.isMuted, protected: false)
                 .aspectRatio(9 / 16, contentMode: .fit)
                 .frame(maxWidth: 250)
                 .background(Color.black)

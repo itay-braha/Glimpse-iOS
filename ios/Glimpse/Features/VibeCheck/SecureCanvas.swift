@@ -18,10 +18,18 @@ final class SecureCanvas: UIView {
 
     private let field = UITextField()
 
-    override init(frame: CGRect) {
+    /// Whether videos people watch in the app are kept out of captures (always,
+    /// except scripted screenshot runs that pass `-allowCapture`).
+    static var protectsMedia: Bool { !LaunchOptions.current.allowCapture }
+
+    override convenience init(frame: CGRect) {
+        self.init(frame: frame, protect: true)
+    }
+
+    init(frame: CGRect, protect: Bool) {
         field.isSecureTextEntry = true
         field.isUserInteractionEnabled = false
-        let canvas = field.layer.sublayers?.first?.delegate as? UIView
+        let canvas = protect ? field.layer.sublayers?.first?.delegate as? UIView : nil
         isProtected = canvas != nil
         contentView = canvas ?? UIView()
         super.init(frame: frame)

@@ -6,7 +6,7 @@ import Foundation
 /// - at most one offer every 10 days, across all topics;
 /// - each topic at most twice ever, and 30 days apart after a "Not now";
 /// - "Don't ask again" ends that topic for good.
-struct AlertNudges: Sendable {
+struct AlertNudges {
     static let quietAfterFirstChoice: TimeInterval = 2 * 86_400
     static let minimumGap: TimeInterval = 10 * 86_400
     static let topicCooldown: TimeInterval = 30 * 86_400

@@ -6,6 +6,7 @@ struct LikesYouView: View {
     @Environment(AppModel.self) private var app
     @State private var model = LikesYouModel()
     @State private var previewing: FeedProfile?
+    @State private var reporting: FeedProfile?
 
     private let columns = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
 
@@ -27,6 +28,20 @@ struct LikesYouView: View {
                             if let profile = like.profile {
                                 RevealedLikeCard(profile: profile, thumbnailURL: thumbnail(for: profile)) {
                                     previewing = profile
+                                }
+                                .contextMenu {
+                                    Button("Like back", systemImage: "heart.fill") {
+                                        Task {
+                                            await model.likeBack(profile, using: app.backend)
+                                            app.matchesDidChange()
+                                        }
+                                    }
+                                    Button("Watch their clips", systemImage: "play.rectangle.fill") { previewing = profile }
+                                    Button("Pass", systemImage: "xmark") {
+                                        Task { await model.pass(profile, using: app.backend) }
+                                    }
+                                    Divider()
+                                    Button("Report or block", systemImage: "flag", role: .destructive) { reporting = profile }
                                 }
                             }
                         }
@@ -61,6 +76,15 @@ struct LikesYouView: View {
                     previewing = nil
                     Task { await model.pass(profile, using: app.backend) }
                 }
+            )
+        }
+        .sheet(item: $reporting) { profile in
+            ReportSheet(
+                name: profile.displayName,
+                onSubmit: { reason, details in
+                    try await app.backend.report(userID: profile.id, reason: reason, details: details, matchID: nil)
+                },
+                onDone: { Task { await model.load(using: app.backend) } }
             )
         }
         .fullScreenCover(item: $model.celebration) { celebration in

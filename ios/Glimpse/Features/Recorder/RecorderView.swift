@@ -28,7 +28,7 @@ struct RecorderView: View {
                     .ignoresSafeArea()
                 captureControls
             case let .review(url):
-                LoopingVideoPlayer(url: url, isActive: true, isMuted: false)
+                LoopingVideoPlayer(url: url, isActive: true, isMuted: false, protected: false)
                     .ignoresSafeArea()
                 reviewControls
             case .uploading:

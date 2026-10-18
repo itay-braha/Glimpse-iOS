@@ -5,6 +5,7 @@ struct MatchesView: View {
     @State private var model = MatchesModel()
     @State private var pendingUnmatch: MatchSummary?
     @State private var exitSurveyFor: MatchSummary?
+    @State private var reportTarget: MatchSummary?
 
     var body: some View {
         @Bindable var app = app
@@ -71,7 +72,7 @@ struct MatchesView: View {
                                         NewMatchBubble(match: match, imageURL: model.avatarURL(for: match))
                                     }
                                     .buttonStyle(.plain)
-                                    .contextMenu { pinButton(match) }
+                                    .contextMenu { actions(for: match) }
                                 }
                             }
                             .padding(.horizontal, 16)
@@ -104,7 +105,7 @@ struct MatchesView: View {
                         )
                     }
                 } footer: {
-                    Text("Swipe right on a conversation to pin it to the top (up to 3) or freeze it. Frozen connections are skipped by auto-release while you keep talking.")
+                    Text("Hold anyone for pin, freeze, unmatch or report, or swipe right to pin (up to 3) or freeze. Frozen connections are skipped by auto-release while you keep talking.")
                 }
                 .listRowBackground(Palette.surface)
             }
@@ -142,6 +143,17 @@ struct MatchesView: View {
                 Text("This frees a spot. You won't see each other again.")
             }
         }
+        .sheet(item: $reportTarget) { match in
+            ReportSheet(
+                name: match.displayName,
+                onSubmit: { reason, details in
+                    try await app.backend.report(
+                        userID: match.otherUserID, reason: reason, details: details, matchID: match.matchID
+                    )
+                },
+                onDone: { app.matchesDidChange() }
+            )
+        }
         .sheet(item: $exitSurveyFor) { match in
             ExitSurveySheet(name: match.displayName) { reason in
                 if let reason {
@@ -172,7 +184,7 @@ struct MatchesView: View {
                 isPinned: model.isPinned(match)
             )
         }
-        .contextMenu { pinButton(match) }
+        .contextMenu { actions(for: match) }
         .swipeActions(edge: .trailing) {
             Button("Unmatch", systemImage: "xmark.circle", role: .destructive) {
                 pendingUnmatch = match
@@ -181,19 +193,38 @@ struct MatchesView: View {
         .swipeActions(edge: .leading) {
             pinButton(match)
                 .tint(Palette.amber)
-            Button(match.isFrozen == true ? "Unfreeze" : "Freeze", systemImage: "snowflake") {
-                Task {
-                    do {
-                        try await model.toggleFreeze(match, using: app.backend)
-                        app.matchesDidChange()
-                    } catch GlimpseError.freezeLimit {
-                        app.paywall = .freeze
-                    } catch {
-                        model.errorMessage = GlimpseError.describe(error)
-                    }
+            freezeButton(match)
+                .tint(Color(hex: 0x7AF0FF))
+        }
+    }
+
+    /// Long-press on anyone in Connections.
+    @ViewBuilder
+    private func actions(for match: MatchSummary) -> some View {
+        pinButton(match)
+        freezeButton(match)
+        Divider()
+        Button("Unmatch", systemImage: "xmark.circle", role: .destructive) {
+            pendingUnmatch = match
+        }
+        Button("Report or block", systemImage: "flag", role: .destructive) {
+            reportTarget = match
+        }
+    }
+
+    /// Past the free freeze, trying again opens Glimpse+.
+    private func freezeButton(_ match: MatchSummary) -> some View {
+        Button(match.isFrozen == true ? "Unfreeze" : "Freeze", systemImage: "snowflake") {
+            Task {
+                do {
+                    try await model.toggleFreeze(match, using: app.backend)
+                    app.matchesDidChange()
+                } catch GlimpseError.freezeLimit {
+                    app.paywall = .freeze
+                } catch {
+                    model.errorMessage = GlimpseError.describe(error)
                 }
             }
-            .tint(Color(hex: 0x7AF0FF))
         }
     }
 

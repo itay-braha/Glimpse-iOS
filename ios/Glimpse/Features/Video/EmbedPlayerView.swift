@@ -46,23 +46,23 @@ struct EmbedPlayerView: View {
 }
 
 /// Hosts a (possibly pre-warmed) web view; detaching it on teardown lets the
-/// same player move to whichever card shows it next.
+/// same player move to whichever card shows it next. Inside a `SecureCanvas`,
+/// so linked posts are kept out of screenshots and recordings too.
 private struct EmbedWebHost: UIViewRepresentable {
     let webView: WKWebView
 
-    func makeUIView(context: Context) -> UIView {
-        let container = UIView()
-        container.backgroundColor = .black
-        attach(to: container)
-        return container
+    func makeUIView(context: Context) -> SecureCanvas {
+        let canvas = SecureCanvas(frame: .zero, protect: SecureCanvas.protectsMedia)
+        attach(to: canvas.contentView)
+        return canvas
     }
 
-    func updateUIView(_ container: UIView, context: Context) {
-        if webView.superview !== container { attach(to: container) }
+    func updateUIView(_ canvas: SecureCanvas, context: Context) {
+        if webView.superview !== canvas.contentView { attach(to: canvas.contentView) }
     }
 
-    static func dismantleUIView(_ container: UIView, coordinator: ()) {
-        container.subviews.forEach { $0.removeFromSuperview() }
+    static func dismantleUIView(_ canvas: SecureCanvas, coordinator: ()) {
+        canvas.contentView.subviews.forEach { $0.removeFromSuperview() }
     }
 
     private func attach(to container: UIView) {

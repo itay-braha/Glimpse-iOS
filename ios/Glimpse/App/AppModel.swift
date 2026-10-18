@@ -11,6 +11,8 @@ enum AppTab: Hashable {
 /// Why the Glimpse+ paywall is being shown (drives its headline).
 enum PaywallReason: String, Identifiable {
     case outOfViews
+    /// Glimpse Gold features (Spotlight, Rewind, Travel mode, clip insights).
+    case gold
     case freeze
     case secondChance
     case settings

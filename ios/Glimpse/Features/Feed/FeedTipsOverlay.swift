@@ -16,6 +16,7 @@ struct FeedTipsOverlay: View {
                 TipRow(symbol: "arrow.up.and.down", title: "Swipe up or down", detail: "Next or previous person.")
                 TipRow(symbol: "arrow.left.and.right", title: "Swipe right to like, left to pass", detail: "Or use the buttons on the side.")
                 TipRow(symbol: "timer", title: "\(Int(clipSeconds))-second clips", detail: "Each clip plays \(Int(clipSeconds)) s, then the next starts. Tap +more to watch the rest. Change it in Settings.")
+                TipRow(symbol: "eye.slash.fill", title: "Videos stay private", detail: "Screenshots and screen recordings of people's videos are blocked and not allowed. They come out blank.")
                 Button("Got it", action: onDone)
                     .buttonStyle(.glimpse)
                     .padding(.top, 6)

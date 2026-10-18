@@ -17,8 +17,8 @@ final class FeedSignals {
         self.backend = backend
     }
 
-    func record(_ kind: FeedEvent.Kind, target: UUID, dwellMs: Int? = nil) {
-        queue.append(FeedEvent(target: target, kind: kind, dwellMs: dwellMs))
+    func record(_ kind: FeedEvent.Kind, target: UUID, dwellMs: Int? = nil, video: UUID? = nil) {
+        queue.append(FeedEvent(target: target, kind: kind, dwellMs: dwellMs, video: video))
         if queue.count >= 15 {
             flush()
         } else if flushTask == nil {

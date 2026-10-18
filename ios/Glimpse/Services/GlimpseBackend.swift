@@ -44,6 +44,17 @@ protocol GlimpseBackend: AnyObject, Sendable {
     func capacityStatus() async throws -> CapacityStatus
     func likeQuota() async throws -> LikeQuota
 
+    // MARK: Glimpse Gold
+    func goldStatus() async throws -> GoldStatus
+    /// Starts the weekly 30-minute Spotlight; returns when it ends.
+    func startSpotlight() async throws -> Date
+    /// Undoes your last pass and returns that person (nil when there's nothing to undo).
+    func rewindLastPass() async throws -> FeedProfile?
+    /// Appear in (and browse) another open city for 1–14 days; returns when the trip ends.
+    func setTravel(latitude: Double, longitude: Double, city: String, days: Int) async throws -> Date
+    func endTravel() async throws
+    func clipInsights() async throws -> [ClipInsight]
+
     // MARK: Liked you (free for everyone)
     func likesReceived() async throws -> LikesReceived
 

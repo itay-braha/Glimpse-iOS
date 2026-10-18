@@ -4,9 +4,9 @@ import Testing
 
 /// Freemium rules as the client sees them (the database enforces the same rules; see pgTAP).
 struct FreemiumTests {
-    @Test func freeUsersGetTwentyLikesADay() async throws {
+    @Test func everyoneGetsTenLikesADay() async throws {
         let backend = DemoBackend(seeded: true)
-        for _ in 0..<20 {
+        for _ in 0..<10 {
             _ = try await backend.swipe(on: UUID(), liked: true)
         }
         let quota = try await backend.likeQuota()
@@ -19,7 +19,7 @@ struct FreemiumTests {
 
     @Test func likingBackAnAdmirerIsAlwaysFree() async throws {
         let backend = DemoBackend(seeded: true)
-        for _ in 0..<20 {
+        for _ in 0..<10 {
             _ = try await backend.swipe(on: UUID(), liked: true)
         }
         let admirer = try #require(DemoData.admirers().first)
@@ -32,7 +32,7 @@ struct FreemiumTests {
         for _ in 0..<30 {
             _ = try await backend.swipe(on: UUID(), liked: false)
         }
-        #expect(try await backend.likeQuota().remaining == 20)
+        #expect(try await backend.likeQuota().remaining == 10)
     }
 
     @Test func likedYouIsFreeForEveryone() async throws {
@@ -43,14 +43,23 @@ struct FreemiumTests {
         #expect(likes.items.allSatisfy { $0.revealed && $0.profile != nil })
     }
 
+    @Test func outOfLikesPutsAdmirersFirst() async throws {
+        let backend = DemoBackend(seeded: true)
+        for _ in 0..<10 {
+            _ = try await backend.swipe(on: UUID(), liked: true)
+        }
+        let first = try #require(try await backend.fetchFeed(limit: 10).first)
+        #expect(DemoData.likedMe().contains(first.id))
+    }
+
     @Test func plusDoesNotBuyMoreLikes() async throws {
         let backend = DemoBackend(seeded: true)
         #expect(try await backend.verifyPurchase(signedTransaction: "demo"))
-        for _ in 0..<20 {
+        for _ in 0..<10 {
             _ = try await backend.swipe(on: UUID(), liked: true)
         }
         let quota = try await backend.likeQuota()
-        #expect(quota.allowance == 20)
+        #expect(quota.allowance == 10)
         #expect(quota.remaining == 0)
     }
 }

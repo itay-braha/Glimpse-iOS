@@ -1,14 +1,21 @@
 import StoreKit
 import SwiftUI
 
-/// Glimpse+ upsell. Sells convenience and curiosity, never more connections:
-/// the 15-match cap, 20 daily likes and "Liked you" are the same for everyone.
+/// Glimpse+ and Glimpse Gold upsell. Sells convenience and curiosity, never more
+/// connections: the 15-match cap, 10 daily likes, "Liked you" and every safety
+/// feature are the same for everyone.
 struct PaywallView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.dismiss) private var dismiss
     let reason: PaywallReason
 
     @State private var legal: LegalDocument?
+    @State private var tier: MembershipTier
+
+    init(reason: PaywallReason) {
+        self.reason = reason
+        _tier = State(initialValue: reason == .gold ? .gold : .plus)
+    }
 
     private var store: StoreManager { app.store }
 
@@ -30,9 +37,9 @@ struct PaywallView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 8) {
                             LogoMark(size: 34)
-                            Text("Glimpse+")
+                            Text(tier.title)
                                 .font(.glimpseTitle)
-                                .foregroundStyle(Palette.brandGradient)
+                                .foregroundStyle(tier == .gold ? AnyShapeStyle(Palette.amber) : AnyShapeStyle(Palette.brandGradient))
                         }
                         Text(headline)
                             .heroFont()
@@ -40,14 +47,31 @@ struct PaywallView: View {
                             .foregroundStyle(Palette.textPrimary)
                     }
 
+                    Picker("Plan", selection: $tier) {
+                        ForEach(MembershipTier.allCases) { option in
+                            Text(option.title).tag(option)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("paywall.tier")
+
                     VStack(alignment: .leading, spacing: 16) {
-                        Benefit(symbol: "rectangle.stack.fill", title: "150 new profiles a day", detail: "Three times the daily glimpses.")
-                        Benefit(symbol: "snowflake", title: "Freeze up to 3 connections", detail: "Protect your favorites from auto-release.")
-                        Benefit(symbol: "arrow.uturn.backward.circle.fill", title: "Second chances", detail: "Ask a released connection to reconnect, once a week.")
-                        Benefit(symbol: "circle.dashed", title: "Same 15-connection circle, same 20 likes", detail: "Some things aren't for sale. Real conversations still win.")
+                        if tier == .gold {
+                            Benefit(symbol: "sparkles", title: "Everything in Glimpse+", detail: "150 profiles a day, 3 freezes, second chances.")
+                            Benefit(symbol: "sun.max.fill", title: "Weekly Spotlight", detail: "Once a week, 30 minutes near the front for people who'd likely like you, inside their own filters.")
+                            Benefit(symbol: "chart.bar.fill", title: "Clip insights", detail: "See which of your clips get watched through, skipped or liked. Totals only, never who.")
+                            Benefit(symbol: "airplane", title: "Travel mode", detail: "Show up in an open city before you get there, for up to 14 days.")
+                            Benefit(symbol: "arrow.uturn.backward", title: "Rewind", detail: "Passed too fast? Bring the last person back, 5 times a day.")
+                        } else {
+                            Benefit(symbol: "rectangle.stack.fill", title: "150 new profiles a day", detail: "Three times the daily glimpses.")
+                            Benefit(symbol: "snowflake", title: "Freeze up to 3 connections", detail: "Protect your favorites from auto-release.")
+                            Benefit(symbol: "arrow.uturn.backward.circle.fill", title: "Second chances", detail: "Ask a released connection to reconnect, once a week.")
+                        }
+                        Benefit(symbol: "circle.dashed", title: "Same 15-connection circle, same 10 likes", detail: "Some things aren't for sale. Real conversations and safety are the same for everyone.")
                     }
                     .padding(18)
                     .background(Palette.surface.opacity(0.85), in: .rect(cornerRadius: 22))
+                    .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(tier == .gold ? Palette.amber.opacity(0.6) : .clear))
 
                     plans
 
@@ -72,6 +96,7 @@ struct PaywallView: View {
     private var headline: String {
         switch reason {
         case .outOfViews: "See more people today."
+        case .gold: tier == .gold ? "Be seen. Go further." : "More glimpses, less waiting."
         case .freeze: "Protect the ones that matter."
         case .secondChance: "Everyone deserves a second chance."
         case .settings: "More glimpses, less waiting."
@@ -80,22 +105,26 @@ struct PaywallView: View {
 
     @ViewBuilder
     private var plans: some View {
-        if app.isDemo || store.products.isEmpty {
+        if app.isDemo || store.products(for: tier).isEmpty {
             VStack(spacing: 10) {
                 Button {
                     Task {
-                        if await store.purchaseDemo(backend: app.backend) { finish() }
+                        if await store.purchaseDemo(tier, backend: app.backend) { finish() }
                     }
                 } label: {
-                    Text(app.isDemo ? "Try Glimpse+ (demo)" : "Glimpse+ isn't available yet")
+                    Text(app.isDemo ? "Try \(tier.title) (demo)" : "\(tier.title) isn't available yet")
                 }
                 .buttonStyle(.glimpse)
                 .disabled(!app.isDemo)
+                .accessibilityIdentifier("paywall.buy")
+                Text(tier.placeholderPrice)
+                    .font(.caption)
+                    .foregroundStyle(Palette.textTertiary)
                 if store.isLoading { ProgressView() }
             }
         } else {
             VStack(spacing: 10) {
-                ForEach(store.products, id: \.id) { product in
+                ForEach(store.products(for: tier), id: \.id) { product in
                     Button {
                         Task { await buy(product) }
                     } label: {
@@ -144,7 +173,7 @@ struct PaywallView: View {
     private func buy(_ product: Product) async {
         guard let accountID = app.profile?.id else { return }
         if await store.purchase(product, accountID: accountID, backend: app.backend) {
-            app.track("plus_purchased", ["product": product.id])
+            app.track(tier == .gold ? "gold_purchased" : "plus_purchased", ["product": product.id])
             finish()
         }
     }

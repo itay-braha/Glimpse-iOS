@@ -31,6 +31,10 @@ enum GlimpseError: LocalizedError, Equatable {
     case paused
     case freezeLimit
     case pinLimit
+    case goldRequired
+    case spotlightUsed
+    case rewindLimit
+    case cityNotOpen
     case plusRequired
     case secondChanceLimit
     case message(String)
@@ -56,6 +60,10 @@ enum GlimpseError: LocalizedError, Equatable {
         case .paused: "Your profile is on a break. Resume it to keep exploring."
         case .freezeLimit: "You've used your free freeze. Glimpse+ protects up to 3 connections."
         case .pinLimit: "You can pin up to 3 conversations. Unpin one first."
+        case .goldRequired: "That's part of Glimpse Gold."
+        case .spotlightUsed: "Your next Spotlight is ready a week after the last one."
+        case .rewindLimit: "You've used today's 5 rewinds."
+        case .cityNotOpen: "Glimpse isn't open in that city yet."
         case .plusRequired: "That's part of Glimpse+."
         case .secondChanceLimit: "You can send one second chance a week."
         case let .message(text): text

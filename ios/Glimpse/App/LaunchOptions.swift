@@ -24,6 +24,8 @@ struct LaunchOptions: Sendable {
     }
 
     var forceDemo = false
+    /// Scripted screenshot runs: show media normally instead of blanking it in captures.
+    var allowCapture = false
     var screen: Screen?
     /// Show the one-time feed tips even in scripted runs (`-showTips`).
     var showTips = false
@@ -34,6 +36,7 @@ struct LaunchOptions: Sendable {
         let arguments = ProcessInfo.processInfo.arguments
         var options = LaunchOptions()
         options.forceDemo = arguments.contains("-demo")
+        options.allowCapture = arguments.contains("-allowCapture")
         options.showTips = arguments.contains("-showTips")
         if let index = arguments.firstIndex(of: "-clipSeconds"), arguments.indices.contains(index + 1) {
             options.clipSeconds = Double(arguments[index + 1])

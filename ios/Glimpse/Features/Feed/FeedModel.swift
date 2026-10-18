@@ -172,6 +172,22 @@ final class FeedModel {
         advance(from: profile.id)
     }
 
+    /// Glimpse Gold: brings back the last person passed and shows them right here.
+    /// Throws `goldRequired` for everyone else.
+    func rewind(using backend: any GlimpseBackend) async throws -> Bool {
+        guard let person = try await backend.rewindLastPass() else { return false }
+        decidedIDs.remove(person.id)
+        profiles.removeAll { $0.id == person.id }
+        await resolveMedia(for: [person], using: backend)
+        let index = currentID.flatMap { id in profiles.firstIndex { $0.id == id } } ?? 0
+        profiles.insert(person, at: min(index, profiles.count))
+        // Moving back isn't a pass on the card that was showing.
+        lastVisibleID = person.id
+        visibleSince = .now
+        currentID = person.id
+        return true
+    }
+
     func remove(_ userID: UUID) {
         decidedIDs.insert(userID)
         advance(from: userID)

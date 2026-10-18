@@ -26,7 +26,7 @@ struct SettingsView: View {
                     verificationRow
                 }
 
-                Section("Glimpse+") {
+                Section("Membership") {
                     if quota?.isPlus == true {
                         Label("You're a Glimpse+ member", systemImage: "sparkles")
                             .foregroundStyle(Palette.mint)
@@ -48,6 +48,21 @@ struct SettingsView: View {
                             }
                         }
                     }
+                    NavigationLink {
+                        GoldView()
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Glimpse Gold")
+                                Text("Spotlight, clip insights, Travel mode, Rewind")
+                                    .font(.caption)
+                                    .foregroundStyle(Palette.textSecondary)
+                            }
+                        } icon: {
+                            Image(systemName: "crown.fill").foregroundStyle(Palette.amber)
+                        }
+                    }
+                    .accessibilityIdentifier("settings.gold")
                 }
 
                 Section {

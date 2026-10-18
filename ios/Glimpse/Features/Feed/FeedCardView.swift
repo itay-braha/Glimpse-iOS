@@ -149,7 +149,10 @@ struct FeedCardView: View {
             showMeMarker = false
             return
         }
-        if !showFullClip { clipStartedAt = .now }
+        if !showFullClip {
+            clipStartedAt = .now
+            if let video { FeedSignals.shared.record(.clipShown, target: profile.id, video: video.id) }
+        }
         withAnimation(.easeOut(duration: 0.3)) { showMeMarker = true }
         Task {
             try? await Task.sleep(for: .seconds(3.5))
@@ -164,6 +167,7 @@ struct FeedCardView: View {
 
     /// After the clip time: the person's next clip, or back to the first after the last.
     private func advanceAutomatically() {
+        if let video { FeedSignals.shared.record(.clipComplete, target: profile.id, video: video.id) }
         showFullClip = false
         if videos.count > 1 {
             videoIndex = (videoIndex + 1) % videos.count
@@ -176,7 +180,7 @@ struct FeedCardView: View {
     private func step(_ delta: Int) {
         guard videos.count > 1 else { return }
         let next = min(max(videoIndex + delta, 0), videos.count - 1)
-        if next > videoIndex { FeedSignals.shared.record(.clipNext, target: profile.id) }
+        if next > videoIndex { FeedSignals.shared.record(.clipNext, target: profile.id, video: video?.id) }
         showFullClip = false
         videoIndex = next
     }
@@ -298,6 +302,7 @@ struct FeedCardView: View {
     private var moreButton: some View {
         Button {
             showFullClip = true
+            if let video { FeedSignals.shared.record(.clipMore, target: profile.id, video: video.id) }
         } label: {
             Label("+\(moreSeconds)s more", systemImage: "forward.fill")
                 .font(.caption.weight(.heavy))
@@ -389,6 +394,7 @@ struct FeedCardView: View {
     private func like() {
         burstID += 1
         guard !isLiked else { return }
+        if let video { FeedSignals.shared.record(.clipLiked, target: profile.id, video: video.id) }
         onLike()
     }
 }

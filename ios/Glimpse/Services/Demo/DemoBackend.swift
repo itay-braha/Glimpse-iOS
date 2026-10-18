@@ -23,11 +23,16 @@ actor DemoBackend: GlimpseBackend {
     private var reactionListeners: [UUID: AsyncStream<MessageReaction>.Continuation] = [:]
     private var replyCursor = 0
     private var isPlus = false
+    private var isGold = false
+    private var spotlightStarted: Date?
+    private var passHistory: [UUID] = []
+    private var rewindTimes: [Date] = []
+    private var travel: (city: String, until: Date)?
     private var likeTimes: [Date] = []
     private var admirers: [FeedProfile]
     private var notices: [AppNotification]
-    /// 20 likes a day for everyone, Glimpse+ included (private.daily_like_allowance).
-    private static let freeDailyLikes = 20
+    /// 10 likes a day for everyone, paid tiers included (private.daily_like_allowance).
+    private static let freeDailyLikes = 10
     private static let freeDailyViews = 50
     private var viewTimes: [Date] = []
     private var pausedUntil: Date?
@@ -240,7 +245,12 @@ actor DemoBackend: GlimpseBackend {
         if let pausedUntil, pausedUntil > .now { return [] }
         viewTimes.removeAll { Date.now.timeIntervalSince($0) > 86_400 }
         let remaining = max(viewAllowance - viewTimes.count, 0)
-        return Array(candidates.filter { !swiped.contains($0.id) }.prefix(min(limit, remaining)))
+        var pool = candidates.filter { !swiped.contains($0.id) }
+        // Out of likes: people who already liked you first (liking back is free).
+        if remainingLikes == 0 {
+            pool = pool.filter { likedMe.contains($0.id) } + pool.filter { !likedMe.contains($0.id) }
+        }
+        return Array(pool.prefix(min(limit, remaining)))
     }
 
     func swipe(on userID: UUID, liked: Bool) throws -> SwipeResult {
@@ -258,6 +268,7 @@ actor DemoBackend: GlimpseBackend {
             likeTimes.append(.now)
         }
         swiped.insert(userID)
+        if !liked { passHistory.append(userID) }
         let pool = candidates + admirers
         guard liked, likedMe.contains(userID), let person = pool.first(where: { $0.id == userID }) else {
             return SwipeResult(matched: false, matchID: nil, booted: nil, likesRemaining: remainingLikes)
@@ -361,9 +372,76 @@ actor DemoBackend: GlimpseBackend {
         return LikesReceived(total: items.count, isPlus: isPlus, freeRevealsLeft: nil, items: items)
     }
 
+    /// "demo" unlocks Glimpse+, "demo-gold" unlocks Glimpse Gold (which includes Plus).
     func verifyPurchase(signedTransaction: String) -> Bool {
         isPlus = true
+        if signedTransaction == "demo-gold" { isGold = true }
         return true
+    }
+
+    // MARK: Glimpse Gold
+
+    private var rewindsLeft: Int {
+        rewindTimes.removeAll { Date.now.timeIntervalSince($0) > 86_400 }
+        return max(5 - rewindTimes.count, 0)
+    }
+
+    func goldStatus() -> GoldStatus {
+        if let travel, travel.until < .now { self.travel = nil }
+        let spotlightEnds = spotlightStarted.map { $0.addingTimeInterval(30 * 60) }
+        let nextSpotlight = spotlightStarted.map { $0.addingTimeInterval(7 * 86_400) }
+        return GoldStatus(
+            isGold: isGold,
+            spotlightUntil: spotlightEnds.flatMap { $0 > .now ? $0 : nil },
+            spotlightAvailableAt: nextSpotlight.flatMap { $0 > .now ? $0 : nil },
+            rewindsLeft: rewindsLeft,
+            travelCity: travel?.city,
+            travelUntil: travel?.until
+        )
+    }
+
+    func startSpotlight() throws -> Date {
+        guard isGold else { throw GlimpseError.goldRequired }
+        if let spotlightStarted, Date.now.timeIntervalSince(spotlightStarted) < 7 * 86_400 {
+            throw GlimpseError.spotlightUsed
+        }
+        spotlightStarted = .now
+        return Date.now.addingTimeInterval(30 * 60)
+    }
+
+    func rewindLastPass() throws -> FeedProfile? {
+        guard isGold else { throw GlimpseError.goldRequired }
+        guard rewindsLeft > 0 else { throw GlimpseError.rewindLimit }
+        guard let last = passHistory.popLast(), let person = candidates.first(where: { $0.id == last }) else { return nil }
+        swiped.remove(last)
+        rewindTimes.append(.now)
+        return person
+    }
+
+    func setTravel(latitude: Double, longitude: Double, city: String, days: Int) throws -> Date {
+        guard isGold else { throw GlimpseError.goldRequired }
+        let until = Date.now.addingTimeInterval(Double(min(max(days, 1), 14)) * 86_400)
+        travel = (city, until)
+        return until
+    }
+
+    func endTravel() {
+        travel = nil
+    }
+
+    /// Sample numbers for the demo profile's clips (the third hasn't been seen enough yet).
+    func clipInsights() throws -> [ClipInsight] {
+        guard isGold else { throw GlimpseError.goldRequired }
+        let samples: [(Int, Double, Double, Int, Int)] = [(48, 0.71, 0.12, 9, 6), (31, 0.46, 0.33, 2, 2), (3, 0, 0, 0, 0)]
+        return videos.enumerated().map { index, video in
+            let sample = samples[min(index, samples.count - 1)]
+            let enough = sample.0 >= 5
+            return ClipInsight(
+                videoID: video.id, viewers: sample.0, enoughData: enough,
+                watchedThrough: enough ? sample.1 : nil, skipped: enough ? sample.2 : nil,
+                moreTaps: enough ? sample.3 : nil, likes: enough ? sample.4 : nil
+            )
+        }
     }
 
     func capacityStatus() -> CapacityStatus {

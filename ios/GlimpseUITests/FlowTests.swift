@@ -4,10 +4,12 @@ import XCTest
 /// named screenshot (kept in the test results) so a run reads as A -> B -> C.
 @MainActor
 final class FlowTests: XCTestCase {
-    private func launch(_ screen: String) -> XCUIApplication {
+    /// Screenshots of other people's videos come out blank in the app, so scripted
+    /// runs pass `-allowCapture` unless a test is checking that protection.
+    private func launch(_ screen: String, protectMedia: Bool = false) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["-demo", "-screen", screen]
+        app.launchArguments = ["-demo", "-screen", screen] + (protectMedia ? [] : ["-allowCapture"])
         app.launch()
         return app
     }
@@ -203,6 +205,41 @@ final class FlowTests: XCTestCase {
         snap("4-1 Liked you: everyone, free")
     }
 
+    // Videos are kept out of screenshots; Glimpse Gold: Rewind and the Gold hub.
+    func testCaptureProtectionAndGold() {
+        let app = launch("feed", protectMedia: true)
+        XCTAssertTrue(app.buttons["Glimpse"].firstMatch.waitForExistence(timeout: 20))
+        pause(3)
+        snap("11-1 A screenshot of the feed: the video comes out blank")
+
+        let first = currentName(app)
+        app.swipeUp()
+        pause(2)
+        XCTAssertNotEqual(currentName(app), first)
+
+        let rewind = app.buttons["feed.rewind"]
+        rewind.tap()
+        let buy = app.buttons["paywall.buy"]
+        XCTAssertTrue(buy.waitForExistence(timeout: 10))
+        XCTAssertTrue(button(app, containing: "Try Glimpse Gold").exists, "Rewind opens Glimpse Gold")
+        snap("11-2 Glimpse Gold")
+        buy.tap()
+        XCTAssertTrue(waitUntilGone(buy, timeout: 10))
+
+        rewind.tap()
+        pause(2)
+        XCTAssertEqual(currentName(app), first, "Rewind brings back the person just passed")
+        snap("11-3 Rewind: they're back")
+
+        app.terminate()
+        let settings = launch("settings")
+        let gold = settings.buttons["settings.gold"]
+        XCTAssertTrue(gold.waitForExistence(timeout: 20))
+        gold.tap()
+        XCTAssertTrue(settings.buttons["gold.upsell"].waitForExistence(timeout: 10))
+        snap("11-4 Gold hub before upgrading")
+    }
+
     // A rare alert offer, pinning a chat, and the report confirmation.
     func testPinsReportAndAlertOffer() {
         let app = launch("alertNudge")
@@ -215,9 +252,12 @@ final class FlowTests: XCTestCase {
         app.tabBars.buttons["Connections"].tap()
         let hila = app.cells.containing(NSPredicate(format: "label CONTAINS 'Hila'")).firstMatch
         XCTAssertTrue(hila.waitForExistence(timeout: 15))
-        hila.swipeRight()
+        // Hold for actions: pin, freeze, unmatch, report.
+        hila.press(forDuration: 1.2)
         let pin = app.buttons["Pin"]
         XCTAssertTrue(pin.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Report or block"].exists)
+        snap("10-2a Hold a conversation for actions")
         pin.tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label ==[c] 'Pinned'")).firstMatch
             .waitForExistence(timeout: 5))
@@ -343,7 +383,7 @@ final class FlowTests: XCTestCase {
         continueAfterFailure = false
         // 12-second clip time so the checks below never race the auto-advance on
         // a slow simulator (15 s clips still leave a "+3s more").
-        app.launchArguments = ["-demo", "-screen", "feed", "-showTips", "-clipSeconds", "12"]
+        app.launchArguments = ["-demo", "-screen", "feed", "-showTips", "-clipSeconds", "12", "-allowCapture"]
         app.launch()
 
         let gotIt = app.buttons["tips.done"]

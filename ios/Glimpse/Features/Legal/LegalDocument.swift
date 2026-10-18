@@ -44,8 +44,8 @@ enum LegalDocument: String, Identifiable, CaseIterable {
     ## Safety and enforcement
     We may hide content, suspend or close accounts, and block devices that break these terms or the Community Rules. Serious violations can result in a permanent ban from the service on the device used.
 
-    ## Glimpse+
-    Glimpse+ is an auto-renewing subscription billed through your Apple ID. It renews unless cancelled at least 24 hours before the period ends. Manage or cancel it in your Apple ID settings. Glimpse+ never increases the 20-connection limit.
+    ## Glimpse+ and Glimpse Gold
+    Glimpse+ and Glimpse Gold are auto-renewing subscriptions billed through your Apple ID. They renew unless cancelled at least 24 hours before the period ends. Manage or cancel them in your Apple ID settings. Neither changes the 15-connection limit, the 10 daily likes, "Liked you" or any safety feature, which are the same for everyone. Glimpse Gold's Spotlight places you nearer the front only for people whose own filters you already fit.
 
     ## Meeting people
     Glimpse does not run criminal background checks. Use good judgment, meet in public places and tell a friend where you're going. Glimpse isn't responsible for the conduct of members on or off the app.
@@ -103,6 +103,9 @@ enum LegalDocument: String, Identifiable, CaseIterable {
 
     ## Show up
     Matches are limited for a reason. Talk to the people you match with, and end connections you're not interested in instead of ghosting.
+
+    ## Respect privacy
+    Screenshots and screen recordings of anyone's videos, video notes or Vibe Checks are blocked in Glimpse and not allowed. During a Vibe Check, an attempt is shown to both people and noted for the safety team. Filming the screen with another device, or sharing anyone's content outside Glimpse, is a serious violation.
 
     ## Keep it appropriate
     No nudity or sexual content in videos. No content involving minors, ever.

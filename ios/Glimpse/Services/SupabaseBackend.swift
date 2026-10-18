@@ -256,7 +256,45 @@ final class SupabaseBackend: GlimpseBackend {
             "verify-purchase",
             options: FunctionInvokeOptions(body: ["signed_transaction": signedTransaction])
         )
-        return response.plan == "plus"
+        return MembershipTier(plan: response.plan) != nil
+    }
+
+    func goldStatus() async throws -> GoldStatus {
+        try await client.rpc("gold_status").execute().value
+    }
+
+    func startSpotlight() async throws -> Date {
+        try await mapLimits { () async throws -> Date in
+            try await client.rpc("start_spotlight").execute().value
+        }
+    }
+
+    func rewindLastPass() async throws -> FeedProfile? {
+        try await mapLimits {
+            let response = try await client.rpc("rewind_last_pass").execute()
+            let text = String(decoding: response.data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty, text != "null" else { return nil }
+            return try JSONDecoder.glimpse().decode(FeedProfile.self, from: response.data)
+        }
+    }
+
+    func setTravel(latitude: Double, longitude: Double, city: String, days: Int) async throws -> Date {
+        try await mapLimits { () async throws -> Date in
+            try await client.rpc(
+                "set_travel",
+                params: TravelParams(latitude: latitude, longitude: longitude, city: city, days: days)
+            ).execute().value
+        }
+    }
+
+    func endTravel() async throws {
+        try await client.rpc("end_travel").execute()
+    }
+
+    func clipInsights() async throws -> [ClipInsight] {
+        try await mapLimits { () async throws -> [ClipInsight] in
+            try await client.rpc("my_clip_insights").execute().value
+        }
     }
 
     /// Turns the database's custom limit codes into typed errors.
@@ -268,6 +306,10 @@ final class SupabaseBackend: GlimpseBackend {
             case ("GL402", "daily_view_limit"): throw GlimpseError.outOfViews
             case ("GL402", "freeze_limit"): throw GlimpseError.freezeLimit
             case ("GL402", "pin_limit"): throw GlimpseError.pinLimit
+            case ("GL402", "gold_required"): throw GlimpseError.goldRequired
+            case ("GL402", "spotlight_used"): throw GlimpseError.spotlightUsed
+            case ("GL402", "rewind_limit"): throw GlimpseError.rewindLimit
+            case ("GL402", "city_not_open"): throw GlimpseError.cityNotOpen
             case ("GL402", "plus_required"): throw GlimpseError.plusRequired
             case ("GL402", "second_chance_limit"): throw GlimpseError.secondChanceLimit
             case ("GL402", _): throw GlimpseError.outOfLikes
@@ -943,6 +985,20 @@ private struct IceServersResponse: Decodable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case iceServers = "ice_servers"
+    }
+}
+
+private struct TravelParams: Encodable, Sendable {
+    let latitude: Double
+    let longitude: Double
+    let city: String
+    let days: Int
+
+    enum CodingKeys: String, CodingKey {
+        case latitude = "p_latitude"
+        case longitude = "p_longitude"
+        case city = "p_city"
+        case days = "p_days"
     }
 }
 

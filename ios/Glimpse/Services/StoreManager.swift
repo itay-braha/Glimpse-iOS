@@ -2,13 +2,13 @@ import Foundation
 import Observation
 import StoreKit
 
-/// Glimpse+ subscriptions with StoreKit 2. Every transaction is re-verified by
+/// Glimpse+ and Glimpse Gold subscriptions with StoreKit 2. Every transaction is re-verified by
 /// the `verify-purchase` function, which owns the entitlement, so a tampered
 /// client can't grant itself Plus.
 @MainActor
 @Observable
 final class StoreManager {
-    static let productIDs = ["com.itaybraha.glimpse.plus.monthly", "com.itaybraha.glimpse.plus.yearly"]
+    static let productIDs = MembershipTier.allCases.flatMap(\.productIDs)
 
     private(set) var products: [Product] = []
     private(set) var isLoading = false
@@ -23,6 +23,10 @@ final class StoreManager {
         defer { isLoading = false }
         let loaded = (try? await Product.products(for: Self.productIDs)) ?? []
         products = loaded.sorted { $0.price < $1.price }
+    }
+
+    func products(for tier: MembershipTier) -> [Product] {
+        products.filter { tier.productIDs.contains($0.id) }
     }
 
     /// Listens for renewals, Ask to Buy approvals and purchases made on other devices.
@@ -67,9 +71,9 @@ final class StoreManager {
         }
     }
 
-    /// Demo builds have no App Store products; unlock Plus locally so the flow can be tried.
-    func purchaseDemo(backend: any GlimpseBackend) async -> Bool {
-        (try? await backend.verifyPurchase(signedTransaction: "demo")) ?? false
+    /// Demo builds have no App Store products; unlock the tier locally so the flow can be tried.
+    func purchaseDemo(_ tier: MembershipTier = .plus, backend: any GlimpseBackend) async -> Bool {
+        (try? await backend.verifyPurchase(signedTransaction: tier == .gold ? "demo-gold" : "demo")) ?? false
     }
 
     func restore(backend: any GlimpseBackend) async -> Bool {
@@ -81,7 +85,7 @@ final class StoreManager {
                 active = true
             }
         }
-        if !active { errorMessage = "No active Glimpse+ subscription was found." }
+        if !active { errorMessage = "No active Glimpse+ or Glimpse Gold subscription was found." }
         return active
     }
 }

@@ -311,8 +311,8 @@ private struct SafetyNotice: View {
         VStack(alignment: .leading, spacing: 10) {
             Label(
                 isProtected
-                    ? "Screenshots and screen recordings of this call come out black, and any attempt is flagged."
-                    : "Screenshots and screen recordings are detected: your video pauses and they're flagged.",
+                    ? "Screenshots and screen recording are blocked and not allowed in Vibe Checks. They come out black, and an attempt is shown to both of you and noted for our safety team."
+                    : "Screenshots and screen recording are not allowed in Vibe Checks. An attempt pauses your video, is shown to both of you and is noted for our safety team.",
                 systemImage: "eye.slash.fill"
             )
             .accessibilityIdentifier(isProtected ? "vibe.captureProtected" : "vibe.captureDetected")

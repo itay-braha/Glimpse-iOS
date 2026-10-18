@@ -47,6 +47,7 @@ struct VibeCheckBanner: View {
                 Button("Green light", action: onGreenLight)
                     .buttonStyle(GlimpseButtonStyle(kind: .secondary))
             }
+            PrivateCallNote()
             Button("Not yet", action: onNotYet)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Palette.textTertiary)
@@ -72,6 +73,7 @@ struct VibeCheckBanner: View {
                     Button("Can't make it") { onAnswer(false) }
                         .buttonStyle(GlimpseButtonStyle(kind: .secondary))
                 }
+                PrivateCallNote()
             }
             .modifier(CardStyle())
         } else if state.confirmed {
@@ -87,6 +89,7 @@ struct VibeCheckBanner: View {
             Text(detail).font(.subheadline).foregroundStyle(Palette.textSecondary)
             Button(primary.0, action: primary.1)
                 .buttonStyle(GlimpseButtonStyle(kind: .primary))
+            PrivateCallNote()
         }
         .modifier(CardStyle())
     }
@@ -99,6 +102,23 @@ struct VibeCheckBanner: View {
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity)
             .background(Palette.surface, in: .capsule)
+    }
+}
+
+/// The quiet promise under every Vibe Check invitation.
+private struct PrivateCallNote: View {
+    var body: some View {
+        Label {
+            Text("Private by design. A Vibe Check can't be screenshotted or recorded by either of you.")
+        } icon: {
+            Image(systemName: "lock.shield.fill")
+                .foregroundStyle(Palette.violet)
+        }
+        .font(.caption)
+        .italic()
+        .foregroundStyle(Palette.textTertiary)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityIdentifier("vibe.privateNote")
     }
 }
 

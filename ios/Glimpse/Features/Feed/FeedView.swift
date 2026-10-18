@@ -1,4 +1,6 @@
+import Combine
 import SwiftUI
+import UIKit
 
 struct FeedView: View {
     @Environment(AppModel.self) private var app
@@ -9,6 +11,10 @@ struct FeedView: View {
     @State private var capacityPrompt: FeedProfile?
     @State private var skipCapacityPrompt = false
     @State private var showLikesInfo = false
+    @State private var admirerCount = 0
+    @State private var rewindNotice: String?
+    /// A gentle note after a screenshot: videos are protected, nothing more happens.
+    @State private var showCaptureNote = false
 
     var body: some View {
         GeometryReader { proxy in
@@ -47,10 +53,52 @@ struct FeedView: View {
         }
         .animation(.smooth(duration: 0.35), value: model.celebration)
         .toolbar(model.celebration == nil ? .visible : .hidden, for: .tabBar)
-        .alert("That's today's likes", isPresented: $showLikesInfo) {
+        .overlay(alignment: .bottom) {
+            if showCaptureNote {
+                Label("Videos on Glimpse are private, so screenshots and recordings come out blank.", systemImage: "eye.slash.fill")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Palette.textPrimary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(.ultraThinMaterial, in: .capsule)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 24)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .accessibilityIdentifier("feed.captureNote")
+            }
+        }
+        .animation(.smooth, value: showCaptureNote)
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.userDidTakeScreenshotNotification)) { _ in
+            showCaptureNote = true
+            Task {
+                try? await Task.sleep(for: .seconds(4))
+                showCaptureNote = false
+            }
+        }
+        .alert(
+            "Rewind",
+            isPresented: Binding(get: { rewindNotice != nil }, set: { if !$0 { rewindNotice = nil } })
+        ) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(likesInfoMessage)
+            Text(rewindNotice ?? "")
+        }
+        .sheet(isPresented: $showLikesInfo) {
+            OutOfLikesSheet(
+                resetsAt: model.quota?.resetsAt,
+                admirers: admirerCount,
+                onSeeAdmirers: {
+                    app.selectedTab = .connections
+                    app.showLikesYou = true
+                },
+                onSeeGold: {
+                    // Let this sheet finish closing before the paywall opens.
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(450))
+                        app.paywall = .gold
+                    }
+                }
+            )
         }
         .sheet(item: $capacityPrompt) { profile in
             if let next = model.capacity.nextToBoot {
@@ -155,20 +203,55 @@ struct FeedView: View {
         .animation(.smooth(duration: 0.4), value: model.currentID)
     }
 
-    /// Everyone gets 20 likes a day; nothing to buy. Liking back and passing stay free.
-    private var likesInfoMessage: String {
-        let base = "Everyone gets 20 likes a day, so each one means something. Liking back someone who liked you and passing are always free."
-        guard let resets = model.quota?.resetsAt, (model.quota?.remaining ?? 1) == 0 else { return base }
-        return base + " More " + resets.formatted(.relative(presentation: .named)) + "."
+    /// Glimpse Gold brings back the last pass; everyone else sees what Gold offers.
+    private func rewind() async {
+        do {
+            if try await model.rewind(using: app.backend) {
+                app.track("rewind_used")
+                // Quiet until the end, like the like counter.
+                let left = (try? await app.backend.goldStatus().rewindsLeft) ?? 5
+                if left <= 1 {
+                    rewindNotice = left == 0 ? "That was your last rewind today. More tomorrow." : "1 rewind left today."
+                }
+            } else {
+                rewindNotice = "There's nobody to bring back right now."
+            }
+        } catch GlimpseError.goldRequired {
+            app.paywall = .gold
+        } catch GlimpseError.rewindLimit {
+            rewindNotice = "You've used today's 5 rewinds. They come back tomorrow."
+        } catch {
+            rewindNotice = GlimpseError.describe(error)
+        }
+    }
+
+    /// Out of likes (or tapping the counter): the "you're out" sheet, with how many
+    /// admirers are waiting, since liking them back is free.
+    private func showOutOfLikes() {
+        Task {
+            await model.refreshQuota(using: app.backend)
+            admirerCount = (try? await app.backend.likesReceived().total) ?? 0
+            showLikesInfo = true
+        }
     }
 
     private var topBar: some View {
         HStack {
             Wordmark(size: 26)
             Spacer()
-            if let quota = model.quota, quota.remaining <= 5 {
+            Button("Rewind", systemImage: "arrow.uturn.backward") {
+                Task { await rewind() }
+            }
+            .labelStyle(.iconOnly)
+            .font(.subheadline.weight(.bold))
+            .foregroundStyle(Palette.amber)
+            .frame(width: 36, height: 36)
+            .background(.ultraThinMaterial, in: .circle)
+            .accessibilityIdentifier("feed.rewind")
+            // Quiet until the last few, like the big apps.
+            if let quota = model.quota, quota.remaining <= 3 {
                 LikesLeftPill(remaining: quota.remaining) {
-                    showLikesInfo = true
+                    if quota.remaining == 0 { showOutOfLikes() }
                 }
             }
             CapacityPill(active: model.capacity.active, cap: model.capacity.cap)
@@ -258,7 +341,7 @@ struct FeedView: View {
                 app.track("profile_liked")
             case .outOfLikes:
                 app.track("out_of_likes")
-                showLikesInfo = true
+                showOutOfLikes()
             case .outOfViews:
                 app.track("out_of_views")
             case .failed:
@@ -275,7 +358,7 @@ private struct LikesLeftPill: View {
 
     var body: some View {
         Button(action: action) {
-            Label(remaining == 0 ? "No likes left" : "\(remaining) left", systemImage: "heart.fill")
+            Label(title, systemImage: remaining == 0 ? "heart.slash.fill" : "heart.fill")
                 .font(.glimpseCaption)
                 .foregroundStyle(remaining == 0 ? Palette.pink : Palette.textPrimary)
                 .padding(.horizontal, 10)
@@ -284,6 +367,15 @@ private struct LikesLeftPill: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(remaining == 0 ? "No likes left today" : "\(remaining) likes left today")
+        .accessibilityIdentifier("feed.likesLeft")
+    }
+
+    private var title: String {
+        switch remaining {
+        case 0: "No likes left"
+        case 1: "Last like today"
+        default: "\(remaining) likes left"
+        }
     }
 }
 
