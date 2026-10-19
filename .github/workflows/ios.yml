@@ -68,13 +68,9 @@ jobs:
           grep -E "error:|\*\* (BUILD|TEST)" build.log | tail -150
           exit $STATUS
 
-      - name: Run unit + UI tests while recording the screen
+      - name: Run unit + UI tests
         id: tests
         run: |
-          mkdir -p recordings
-          xcrun simctl io "${{ steps.sim.outputs.udid }}" recordVideo --codec=h264 --force recordings/ui-flows.mp4 &
-          REC=$!
-          sleep 2
           set +e
           xcodebuild test-without-building \
             -project ios/Glimpse.xcodeproj -scheme Glimpse \
@@ -84,7 +80,6 @@ jobs:
             -retry-tests-on-failure -test-iterations 2 \
             > test.log 2>&1
           STATUS=$?
-          kill -INT $REC; wait $REC
           # A UI test that failed once and passed on its retry is a timing flake, not a broken flow.
           grep -iE "retry" test.log | tail -20 || true
           grep -E "✔|✘|Test run|passed after|failed after|error:|XCTAssert|\*\* TEST" test.log | tail -200
@@ -100,6 +95,16 @@ jobs:
           bash scripts/ci-screenshots.sh "${{ steps.sim.outputs.udid }}" \
             ios/.derived/Build/Products/Debug-iphonesimulator/Glimpse.app screenshots || true
 
+      # Phone-sized JPEGs instead of full-resolution PNGs (~10x smaller download).
+      - name: Shrink screenshots
+        if: always()
+        run: |
+          for f in ui-flows/*.png screenshots/*.png; do
+            [ -f "$f" ] || continue
+            sips -Z 1000 -s format jpeg -s formatOptions 75 "$f" --out "${f%.png}.jpg" >/dev/null && rm "$f"
+          done
+          du -sh ui-flows screenshots 2>/dev/null || true
+
       # Small and quick to download: every screenshot plus the logs.
       - uses: actions/upload-artifact@v4
         if: always()
@@ -110,14 +115,4 @@ jobs:
             screenshots/
             build.log
             test.log
-          if-no-files-found: ignore
-
-      # The screen recording of the whole UI run (~1 GB) is kept only when a test really
-      # failed (after its retry), to see what happened; a passing run throws it away.
-      - uses: actions/upload-artifact@v4
-        if: always() && steps.tests.outcome == 'failure'
-        with:
-          name: recording-${{ github.run_number }}
-          path: recordings/
-          retention-days: 3
           if-no-files-found: ignore

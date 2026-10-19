@@ -44,7 +44,7 @@ record() {
   local name="$1" secs="$2"
   shift 2
   xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
-  xcrun simctl launch "$UDID" "$BUNDLE_ID" -demo "$@" >/dev/null
+  xcrun simctl launch "$UDID" "$BUNDLE_ID" -demo -allowCapture "$@" >/dev/null
   sleep 6
   xcrun simctl io "$UDID" recordVideo --codec=h264 --force "$OUT/$name.mp4" &
   local pid=$!
