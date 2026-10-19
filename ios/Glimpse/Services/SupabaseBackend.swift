@@ -508,6 +508,13 @@ final class SupabaseBackend: GlimpseBackend {
             .execute()
     }
 
+    func setDateCheckins(_ enabled: Bool) async throws {
+        try await client.from("profiles")
+            .update(["ask_date_checkins": enabled])
+            .eq("id", value: currentUserKey())
+            .execute()
+    }
+
     func markRead(matchID: UUID) async throws {
         try await client.rpc("mark_read", params: ["p_match": matchID]).execute()
     }

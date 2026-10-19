@@ -152,6 +152,8 @@ protocol GlimpseBackend: AnyObject, Sendable {
     func setPushExtras(_ extras: [AlertExtra]) async throws
     /// Both are opt-in and off by default.
     func setDataConsent(aiTraining: Bool, sharing: Bool) async throws
+    /// Turns the after-date question on or off.
+    func setDateCheckins(_ enabled: Bool) async throws
     func unregisterPushToken(_ token: String) async
 
     // MARK: Verification

@@ -220,6 +220,11 @@ final class AppModel {
         try? await backend.setDataConsent(aiTraining: aiTraining, sharing: sharing)
     }
 
+    func setDateCheckins(_ enabled: Bool) async {
+        profile?.askDateCheckins = enabled
+        try? await backend.setDateCheckins(enabled)
+    }
+
     /// From the alerts sheet: remember the choice, then (if any) iOS's own prompt.
     func choseAlerts(_ scope: PushScope?) async {
         askForAlerts = false

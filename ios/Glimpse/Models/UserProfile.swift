@@ -25,6 +25,8 @@ struct UserProfile: Codable, Identifiable, Hashable, Sendable {
     var consentAiTraining: Bool?
     /// Opt-in: aggregate statistics (groups of 20+) may be shared outside Glimpse.
     var consentDataSharing: Bool?
+    /// Whether to ask "how did your date go?" after dates planned in the app.
+    var askDateCheckins: Bool?
 
     var age: Int? {
         guard let date = BirthdateFormat.date(from: birthdate) else { return nil }
@@ -50,5 +52,6 @@ struct UserProfile: Codable, Identifiable, Hashable, Sendable {
         case pushExtras = "push_extras"
         case consentAiTraining = "consent_ai_training"
         case consentDataSharing = "consent_data_sharing"
+        case askDateCheckins = "ask_date_checkins"
     }
 }

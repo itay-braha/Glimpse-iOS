@@ -810,6 +810,10 @@ actor DemoBackend: GlimpseBackend {
         profile?.consentDataSharing = sharing
     }
 
+    func setDateCheckins(_ enabled: Bool) {
+        profile?.askDateCheckins = enabled
+    }
+
     func markRead(matchID: UUID) {
         guard let index = matches.firstIndex(where: { $0.matchID == matchID }) else { return }
         matches[index].unreadCount = 0

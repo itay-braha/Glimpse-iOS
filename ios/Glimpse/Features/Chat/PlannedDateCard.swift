@@ -100,7 +100,7 @@ struct PlannedDateCard: View {
     private var checkIn: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("How did it go with \(name)?").font(.glimpseHeadline)
-            Text("Only Glimpse sees your answer, and \(name) is never told. Plans change, and that's fine.")
+            Text("Optional, and only Glimpse sees it. \(name) is never told. Plans change, and that's fine.")
                 .font(.caption)
                 .foregroundStyle(Palette.textSecondary)
             ForEach(DateOutcome.choices, id: \.self) { outcome in

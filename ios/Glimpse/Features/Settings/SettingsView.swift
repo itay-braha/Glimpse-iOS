@@ -140,6 +140,19 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Toggle("Ask how my dates went", isOn: Binding(
+                        get: { app.profile?.askDateCheckins ?? true },
+                        set: { on in Task { await app.setDateCheckins(on) } }
+                    ))
+                    .tint(Palette.mint)
+                    .accessibilityIdentifier("settings.dateCheckins")
+                } header: {
+                    Text("Dates")
+                } footer: {
+                    Text("After a date you planned in Glimpse, we ask once, privately, how it went. It's always optional, and plans you make outside the app are never asked about.")
+                }
+
+                Section {
                     Toggle("Help improve matching", isOn: Binding(
                         get: { app.profile?.consentAiTraining ?? false },
                         set: { on in
