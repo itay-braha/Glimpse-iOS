@@ -1,6 +1,6 @@
 # Glimpse (iOS app)
 
-The SwiftUI client of **Glimpse**, a video-first dating app with a 20-connection cap.
+The SwiftUI client of **Glimpse**, a video-first dating app with a 15-connection cap.
 
 This repository holds the iOS app only. It runs fully in **demo mode** (seeded profiles,
 simulated replies, a simulated Vibe Check partner). The backend that powers the real

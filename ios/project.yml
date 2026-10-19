@@ -31,8 +31,12 @@ targets:
       - path: Glimpse
         excludes:
           - "Legal/**"
+          - "Resources/PrivacyInfo.xcprivacy"
       # Legal documents (Hebrew and English), read at runtime.
       - path: Glimpse/Legal
+        buildPhase: resources
+      # Privacy manifest (required for App Store uploads).
+      - path: Glimpse/Resources/PrivacyInfo.xcprivacy
         buildPhase: resources
     configFiles:
       Debug: Config/Glimpse.xcconfig
