@@ -69,6 +69,7 @@ jobs:
           exit $STATUS
 
       - name: Run unit + UI tests while recording the screen
+        id: tests
         run: |
           mkdir -p recordings
           xcrun simctl io "${{ steps.sim.outputs.udid }}" recordVideo --codec=h264 --force recordings/ui-flows.mp4 &
@@ -111,9 +112,10 @@ jobs:
             test.log
           if-no-files-found: ignore
 
-      # The full screen recording of the UI tests is large (~1 GB): separate, kept 3 days.
+      # The screen recording of the whole UI run (~1 GB) is kept only when a test really
+      # failed (after its retry), to see what happened; a passing run throws it away.
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.tests.outcome == 'failure'
         with:
           name: recording-${{ github.run_number }}
           path: recordings/
