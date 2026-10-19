@@ -12,7 +12,7 @@ You are not legally required to give us any information. Without the information
 **Approximate location:** rounded to about 1 km, used to show people nearby and distances and to decide when your area opens. Your exact location is never stored or shown.
 **Messages:** text, voice and video notes you send to your matches, reactions and read receipts. If you delete a message, it disappears from the chat but a private copy is kept for 30 days (longer if the conversation is reported) for safety review.
 **Vibe Check safety recordings:** during a 3-minute Vibe Check, after you agree in the lobby, each phone records what its own camera and microphone send and a low-quality copy of the video it receives, and uploads them to our private storage while the call runs. Attempts to screenshot or screen-record a call are logged.
-**Activity:** likes, passes, matches, how long you watch clips, which clips you skip or finish, conversation activity (when, not what), reports you make and receive, safety decisions, and a behaviour score based on how members treat each other.
+**Activity:** likes, passes, matches, how long you watch clips, which clips you skip or finish, conversation activity (when, not what), dates you plan in the app, changes to them and, if you tell us, how they went, reports you make and receive, safety decisions, and a behaviour score based on how members treat each other.
 **Selfie verification:** a short live selfie video, reviewed by a person on our team to confirm you are the person in your profile. We do not create biometric templates.
 **Purchases:** whether you have an active subscription and its renewal dates (from Apple). We never receive your payment card details.
 **Device and diagnostics:** device type, app version, a device-integrity signal from Apple (DeviceCheck), push notification tokens, crash reports and basic usage events.
@@ -25,7 +25,7 @@ To create and run your account; show you profiles and show you to others; run ma
 
 ## Optional: research and model training
 Two settings, both off unless you turn them on (Settings → Your data), and you can turn them off at any time:
-**Help improve matching:** your activity (likes, passes, watch time, match outcomes and conversation timing, never message text, videos, your name, phone number or exact location) may be used under a random code instead of your identity to train Glimpse's own matching and safety models.
+**Help improve matching:** your activity (likes, passes, watch time, match outcomes, conversation and date timing, never message text, videos, your name, phone number or exact location) may be used under a random code instead of your identity to train Glimpse's own matching and safety models.
 **Share anonymous trends:** statistics about groups of at least 20 members (for example, like rates by age range and region) may be shared with research or business partners. Nothing about you individually is shared. **We do not sell your personal information.**
 
 ## Who we share it with
