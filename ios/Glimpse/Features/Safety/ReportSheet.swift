@@ -7,6 +7,8 @@ struct ReportSheet: View {
     let name: String
     let onSubmit: @MainActor (ReportReason, String?) async throws -> Void
     var onDone: @MainActor () -> Void = {}
+    /// Pre-selects a reason (e.g. "unsafe in person" after a date check-in).
+    var preselected: ReportReason?
 
     @Environment(\.dismiss) private var dismiss
     @State private var reason: ReportReason?
@@ -29,6 +31,7 @@ struct ReportSheet: View {
         }
         .presentationDetents([.large])
         .interactiveDismissDisabled(submitted != nil)
+        .onAppear { if reason == nil { reason = preselected } }
     }
 
     private var form: some View {

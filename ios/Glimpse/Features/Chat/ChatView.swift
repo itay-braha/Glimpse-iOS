@@ -13,6 +13,10 @@ struct ChatView: View {
     @State private var showPropose = false
     @State private var showCall = false
     @State private var showDatePlan = false
+    /// Set when the plan sheet moves an existing date instead of suggesting a new one.
+    @State private var rescheduleDateID: UUID?
+    @State private var reschedulePlace = ""
+    @State private var reportPreselect: ReportReason?
     @State private var showVibeInfo = false
     @State private var friendlyFollowUp = false
     @State private var recorder = ChatMediaRecorder()
@@ -116,10 +120,27 @@ struct ChatView: View {
                             app.matchesDidChange()
                         }
                     },
+                    onChangeTime: {
+                        rescheduleDateID = plan.id
+                        reschedulePlace = plan.place
+                        showDatePlan = true
+                    },
                     onDirections: { openURL($0) },
                     onCheckIn: { outcome in
+                        let planID = plan.id
                         Task { await model.checkIn(outcome, using: app.backend) }
                         app.track("date_checkin", ["outcome": outcome.rawValue])
+                        switch outcome {
+                        case .rescheduled:
+                            rescheduleDateID = planID
+                            reschedulePlace = plan.place
+                            showDatePlan = true
+                        case .uncomfortable:
+                            reportPreselect = .unsafeInPerson
+                            showReport = true
+                        default:
+                            break
+                        }
                     }
                 )
                 .background(Palette.midnight)
@@ -244,7 +265,7 @@ struct ChatView: View {
         .onDisappear { recorder.teardown() }
         .task { recorder.demoFallback = app.isDemo }
         .task { await model.run(using: app.backend, myID: myID) }
-        .sheet(isPresented: $showReport) {
+        .sheet(isPresented: $showReport, onDismiss: { reportPreselect = nil }) {
             ReportSheet(
                 name: model.match.displayName,
                 onSubmit: { reason, details in
@@ -252,7 +273,8 @@ struct ChatView: View {
                         userID: model.match.otherUserID, reason: reason, details: details, matchID: model.match.matchID
                     )
                 },
-                onDone: { leave() }
+                onDone: { leave() },
+                preselected: reportPreselect
             )
         }
         .confirmationDialog("Unmatch \(model.match.displayName)?", isPresented: $confirmUnmatch, titleVisibility: .visible) {
@@ -298,13 +320,21 @@ struct ChatView: View {
                 await model.refreshDateIdea(using: app.backend)
             }
         }
-        .sheet(isPresented: $showDatePlan) {
+        .sheet(isPresented: $showDatePlan, onDismiss: { rescheduleDateID = nil }) {
             DatePlanSheet(
-                place: model.dateIdea?.spot?.name ?? model.dateIdea?.idea ?? model.plannedDate?.place ?? "",
+                place: rescheduleDateID != nil ? reschedulePlace
+                    : model.dateIdea?.spot?.name ?? model.dateIdea?.idea ?? model.plannedDate?.place ?? "",
                 name: model.match.displayName
             ) { when in
+                // Read it now: closing the sheet clears it before the task runs.
+                let movingDateID = rescheduleDateID
                 Task {
-                    if await model.proposeDate(at: when, using: app.backend) {
+                    if let dateID = movingDateID {
+                        if await model.rescheduleDate(dateID, at: when, using: app.backend) {
+                            app.track("date_rescheduled")
+                            app.matchesDidChange()
+                        }
+                    } else if await model.proposeDate(at: when, using: app.backend) {
                         if let idea = model.dateIdea {
                             await app.backend.logDateIdea(idea.id, feedback: .shared)
                         }

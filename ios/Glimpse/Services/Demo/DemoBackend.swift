@@ -755,6 +755,24 @@ actor DemoBackend: GlimpseBackend {
         }
     }
 
+    func rescheduleDate(_ dateID: UUID, at date: Date) throws -> PlannedDate {
+        guard let key = plannedDates.first(where: { $0.value.id == dateID })?.key, var plan = plannedDates[key] else {
+            throw GlimpseError.message("That plan isn't available any more.")
+        }
+        // Like the server: a new time goes back to the other person, and old answers are cleared.
+        plan.startsAt = date
+        plan.status = .proposed
+        plan.proposedBy = me
+        plan.myCheckin = nil
+        plan.canCheckIn = false
+        plannedDates[key] = plan
+        Task {
+            try? await Task.sleep(for: .milliseconds(1_500))
+            self.demoConfirm(key, planID: plan.id)
+        }
+        return plan
+    }
+
     func myPlannedDates() -> [UpcomingDate] {
         plannedDates.values.filter(\.isUpcoming).map {
             UpcomingDate(matchID: $0.matchID, startsAt: $0.startsAt, status: $0.status, place: $0.place, proposedBy: $0.proposedBy)

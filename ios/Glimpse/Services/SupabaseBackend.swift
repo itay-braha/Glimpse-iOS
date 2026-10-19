@@ -686,6 +686,12 @@ final class SupabaseBackend: GlimpseBackend {
         try await client.rpc("cancel_date", params: ["p_date": dateID]).execute()
     }
 
+    func rescheduleDate(_ dateID: UUID, at date: Date) async throws -> PlannedDate {
+        try await mapLimits { () async throws -> PlannedDate in
+            try await client.rpc("reschedule_date", params: RescheduleDateParams(date: dateID, at: date)).execute().value
+        }
+    }
+
     func myPlannedDates() async throws -> [UpcomingDate] {
         try await client.rpc("my_planned_dates").execute().value
     }
@@ -1090,6 +1096,16 @@ private struct ProposeDateParams: Encodable, Sendable {
     enum CodingKeys: String, CodingKey {
         case match = "p_match"
         case suggestion = "p_suggestion"
+        case at = "p_at"
+    }
+}
+
+private struct RescheduleDateParams: Encodable, Sendable {
+    let date: UUID
+    let at: Date
+
+    enum CodingKeys: String, CodingKey {
+        case date = "p_date"
         case at = "p_at"
     }
 }

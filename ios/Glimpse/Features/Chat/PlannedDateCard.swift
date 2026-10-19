@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// The date the two of them are planning, at the top of the chat: suggested (accept or
-/// pick another time), set (directions, a countdown, cancel), and afterwards the
-/// private "Did they show up?".
+/// pick another time), set (directions, change the time, cancel), and afterwards the
+/// private "How did it go?".
 struct PlannedDateCard: View {
     let plan: PlannedDate
     let name: String
@@ -10,6 +10,7 @@ struct PlannedDateCard: View {
     let onAccept: () -> Void
     let onOtherTime: () -> Void
     let onCancel: () -> Void
+    let onChangeTime: () -> Void
     let onDirections: (URL) -> Void
     let onCheckIn: (DateOutcome) -> Void
 
@@ -83,6 +84,11 @@ struct PlannedDateCard: View {
                     Button("Directions", systemImage: "map.fill") { onDirections(link) }
                         .buttonStyle(GlimpseButtonStyle(kind: .secondary))
                 }
+                if plan.status == .confirmed || proposedByMe {
+                    Button("Change time", systemImage: "calendar.badge.clock", action: onChangeTime)
+                        .buttonStyle(GlimpseButtonStyle(kind: .secondary))
+                        .accessibilityIdentifier("plannedDate.changeTime")
+                }
                 Button(plan.status == .confirmed ? String(localized: "Cancel date") : String(localized: "Withdraw"), role: .destructive, action: onCancel)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Palette.textSecondary)
@@ -93,14 +99,20 @@ struct PlannedDateCard: View {
 
     private var checkIn: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Did \(name) show up?").font(.glimpseHeadline)
-            Text("Only Glimpse sees your answer. It helps people who show up get noticed.")
+            Text("How did it go with \(name)?").font(.glimpseHeadline)
+            Text("Only Glimpse sees your answer, and \(name) is never told. Plans change, and that's fine.")
                 .font(.caption)
                 .foregroundStyle(Palette.textSecondary)
-            ForEach(DateOutcome.allCases, id: \.self) { outcome in
-                Button(outcome.label) { onCheckIn(outcome) }
+            ForEach(DateOutcome.choices, id: \.self) { outcome in
+                Button(outcome.label, systemImage: outcome.symbol) { onCheckIn(outcome) }
                     .buttonStyle(GlimpseButtonStyle(kind: outcome == .great ? .primary : .secondary))
+                    .accessibilityIdentifier("checkIn.\(outcome.rawValue)")
             }
+            Button(DateOutcome.skipped.label) { onCheckIn(.skipped) }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Palette.textSecondary)
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("checkIn.skipped")
         }
         .accessibilityIdentifier("plannedDate.checkIn")
     }

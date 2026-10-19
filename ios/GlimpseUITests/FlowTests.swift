@@ -285,6 +285,7 @@ final class FlowTests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["plannedDate"].waitForExistence(timeout: 5))
         XCTAssertTrue(text(app, containing: "Your date with").waitForExistence(timeout: 8), "they accepted")
         snap("12-4 The date is set")
+        XCTAssertTrue(app.buttons["plannedDate.changeTime"].exists, "a set date can be moved to another time")
         app.navigationBars.buttons.firstMatch.tap()
         XCTAssertTrue(app.descendants(matching: .any)["matches.dateChip"].firstMatch.waitForExistence(timeout: 10))
         snap("12-5 The date shows in Connections")

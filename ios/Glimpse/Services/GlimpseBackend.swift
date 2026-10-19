@@ -129,6 +129,8 @@ protocol GlimpseBackend: AnyObject, Sendable {
     func proposeDate(matchID: UUID, ideaID: UUID, at date: Date) async throws -> PlannedDate
     func respondDate(_ dateID: UUID, accept: Bool) async throws -> PlannedDate
     func cancelDate(_ dateID: UUID) async throws
+    /// Moves the plan to a new time; the other person accepts again.
+    func rescheduleDate(_ dateID: UUID, at date: Date) async throws -> PlannedDate
     func myPlannedDates() async throws -> [UpcomingDate]
     /// Private: did they show up?
     func checkInDate(_ dateID: UUID, outcome: DateOutcome) async throws

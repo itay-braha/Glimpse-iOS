@@ -237,6 +237,17 @@ final class ChatModel {
         plannedDate = nil
     }
 
+    /// Moves a plan (before the date, or from the check-in) to a new time.
+    func rescheduleDate(_ dateID: UUID, at date: Date, using backend: any GlimpseBackend) async -> Bool {
+        do {
+            plannedDate = try await backend.rescheduleDate(dateID, at: date)
+            return true
+        } catch {
+            errorMessage = GlimpseError.describe(error)
+            return false
+        }
+    }
+
     func checkIn(_ outcome: DateOutcome, using backend: any GlimpseBackend) async {
         guard let plan = plannedDate else { return }
         try? await backend.checkInDate(plan.id, outcome: outcome)
