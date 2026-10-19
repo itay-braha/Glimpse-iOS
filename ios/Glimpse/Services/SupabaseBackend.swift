@@ -76,7 +76,17 @@ final class SupabaseBackend: GlimpseBackend {
             bio: draft.bio.isEmpty ? nil : draft.bio,
             city: draft.city.isEmpty ? nil : draft.city
         )
-        return try await client.from("profiles").insert(row).select().single().execute().value
+        let profile: UserProfile = try await client.from("profiles").insert(row).select().single().execute().value
+        try await setHeight(draft.height)
+        return profile
+    }
+
+    func fetchMyHeight() async throws -> HeightSetting {
+        try await client.rpc("my_height").execute().value
+    }
+
+    func setHeight(_ height: HeightSetting) async throws {
+        try await client.rpc("set_height", params: HeightParams(heightCm: height.heightCm, show: height.isShown)).execute()
     }
 
     func updateProfile(_ update: ProfileUpdate) async throws {
@@ -1091,6 +1101,23 @@ private struct RespondDateParams: Encodable, Sendable {
     enum CodingKeys: String, CodingKey {
         case date = "p_date"
         case accept = "p_accept"
+    }
+}
+
+private struct HeightParams: Encodable, Sendable {
+    let heightCm: Int?
+    let show: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case heightCm = "p_height_cm"
+        case show = "p_show"
+    }
+
+    // Both arguments are always sent (a missing one wouldn't match the function).
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(heightCm, forKey: .heightCm)
+        try container.encode(show, forKey: .show)
     }
 }
 

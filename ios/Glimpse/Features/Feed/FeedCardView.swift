@@ -384,8 +384,15 @@ struct FeedCardView: View {
                 if let km = profile.distanceKm {
                     Text(km <= 1 ? String(localized: "Under 1 km away") : String(localized: "\(km) km away"))
                 }
+                if let cm = profile.heightCm {
+                    Label(HeightSetting.label(cm), systemImage: "ruler")
+                        .accessibilityLabel(String(localized: "Height \(HeightSetting.label(cm))"))
+                        .accessibilityIdentifier("card.height")
+                }
             }
             .font(.subheadline.weight(.semibold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
             .foregroundStyle(Palette.textPrimary.opacity(0.85))
             if let bio = profile.bio {
                 Text(bio)

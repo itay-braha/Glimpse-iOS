@@ -11,6 +11,7 @@ actor DemoBackend: GlimpseBackend {
     private let me = DemoData.meID
     private var signedIn: Bool
     private var profile: UserProfile?
+    private var height = HeightSetting.unanswered
     private var videos: [ProfileVideo]
     private var candidates: [FeedProfile]
     private var likedMe: Set<UUID>
@@ -125,7 +126,17 @@ actor DemoBackend: GlimpseBackend {
             verificationStatus: "none"
         )
         profile = created
+        setHeight(draft.height)
         return created
+    }
+
+    func fetchMyHeight() -> HeightSetting {
+        height
+    }
+
+    func setHeight(_ new: HeightSetting) {
+        // Like the server: hiding keeps the number; showing needs one.
+        height = HeightSetting(heightCm: new.heightCm ?? height.heightCm, isShown: new.isShown && (new.heightCm ?? height.heightCm) != nil)
     }
 
     func updateProfile(_ update: ProfileUpdate) {

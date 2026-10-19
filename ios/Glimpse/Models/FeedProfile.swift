@@ -14,6 +14,8 @@ struct FeedProfile: Codable, Identifiable, Hashable, Sendable {
     var discoveryNote: DiscoveryNote?
     /// Showed up to dates with different matches (a positive badge; negatives are never shown).
     var showsUp: Bool?
+    /// Height in cm, only when they chose to show it.
+    var heightCm: Int?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -26,5 +28,6 @@ struct FeedProfile: Codable, Identifiable, Hashable, Sendable {
         case videos
         case discoveryNote = "discovery_note"
         case showsUp = "shows_up"
+        case heightCm = "height_cm"
     }
 }

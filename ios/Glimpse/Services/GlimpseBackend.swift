@@ -17,6 +17,9 @@ protocol GlimpseBackend: AnyObject, Sendable {
     func fetchMyProfile() async throws -> UserProfile?
     func createProfile(_ draft: ProfileDraft) async throws -> UserProfile
     func updateProfile(_ update: ProfileUpdate) async throws
+    func fetchMyHeight() async throws -> HeightSetting
+    /// A height to show, or hidden (a hidden height is never sent to anyone else).
+    func setHeight(_ height: HeightSetting) async throws
     func fetchMyVideos() async throws -> [ProfileVideo]
     func uploadClip(_ clip: RecordedClip) async throws -> ProfileVideo
     func deleteVideo(_ video: ProfileVideo) async throws

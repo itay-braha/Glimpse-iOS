@@ -1091,3 +1091,17 @@
 "Your next match will release your quietest connection. Keep the good ones talking." = "ההתאמה הבאה תשחרר את הקשר השקט ביותר שלך. תמשיכו לדבר עם הטובים.";
 "not ready yet" = "עדיין לא מוכן/ה";
 "ready" = "מוכן/ה";
+"%@ cm" = "%1$@ ס״מ";
+"%lld cm" = "%1$lld ס״מ";
+"%lf cm" = "%1$lf ס״מ";
+"Height" = "גובה";
+"Height %@" = "גובה %1$@";
+"Height %lld" = "גובה %1$lld";
+"Height %lf" = "גובה %1$lf";
+"Choose your height" = "בחרו את הגובה שלכם";
+"Don't show my height" = "לא להציג את הגובה שלי";
+"It won't appear on your profile. You can add it any time." = "הגובה לא יופיע בפרופיל. אפשר להוסיף אותו בכל זמן.";
+"Shown on your profile while people watch your clips." = "מוצג בפרופיל שלך בזמן שצופים בקליפים שלך.";
+"Not set" = "לא הוגדר";
+"Show my height" = "להציג את הגובה שלי";
+"Shown on your profile while people watch your clips. Turn it off and it stays private." = "מוצג בפרופיל שלך בזמן שצופים בקליפים שלך. אם מכבים, הוא נשאר פרטי.";

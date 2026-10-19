@@ -8,4 +8,5 @@ struct ProfileDraft: Sendable {
     var interestedIn: Set<Gender>
     var city: String
     var bio: String
+    var height: HeightSetting
 }

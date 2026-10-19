@@ -9,6 +9,8 @@ struct ProfileBasicsView: View {
     @State private var interestedIn: Set<Gender> = []
     @State private var city = ""
     @State private var bio = ""
+    @State private var heightCm: Int?
+    @State private var hidesHeight = false
     @State private var isSaving = false
     @State private var errorMessage: String?
 
@@ -19,6 +21,7 @@ struct ProfileBasicsView: View {
     private var isValid: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty && gender != nil && !interestedIn.isEmpty
             && birthdate <= latestAllowedBirthdate
+            && (heightCm != nil || hidesHeight)
     }
 
     var body: some View {
@@ -64,6 +67,9 @@ struct ProfileBasicsView: View {
                 }
             }
 
+            FieldLabel("Height")
+            HeightChooser(heightCm: $heightCm, hidesHeight: $hidesHeight)
+
             FieldLabel("City")
             TextField("Where you're based", text: $city)
                 .textContentType(.addressCity)
@@ -108,7 +114,8 @@ struct ProfileBasicsView: View {
             gender: gender,
             interestedIn: interestedIn,
             city: city.trimmingCharacters(in: .whitespacesAndNewlines),
-            bio: bio.trimmingCharacters(in: .whitespacesAndNewlines)
+            bio: bio.trimmingCharacters(in: .whitespacesAndNewlines),
+            height: HeightSetting(heightCm: heightCm, isShown: !hidesHeight)
         )
         do {
             let profile = try await app.backend.createProfile(draft)

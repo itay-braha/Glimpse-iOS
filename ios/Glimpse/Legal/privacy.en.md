@@ -6,7 +6,7 @@ You are not legally required to give us any information. Without the information
 
 ## What we collect
 **Account:** your mobile number (to sign you in and keep out fake accounts), and whether it is a real mobile line (checked with our SMS provider).
-**Profile:** name, date of birth (age), gender, the genders you're interested in, age and distance preferences, a short bio, city.
+**Profile:** name, date of birth (age), gender, the genders you're interested in, age and distance preferences, a short bio, city, and your height (or your choice not to show it; a hidden height is never shown to anyone).
 **Videos and photos:** clips you record or upload, and links to Instagram or TikTok posts you choose to add; when each clip was filmed or posted.
 **Sensitive information:** your gender and the genders you're interested in can reveal your sexual orientation, which the law treats as information of special sensitivity. We use it only to show you and others suitable matches and to apply safety rules, and you agree to this explicitly when you sign up.
 **Approximate location:** rounded to about 1 km, used to show people nearby and distances and to decide when your area opens. Your exact location is never stored or shown.

@@ -12,6 +12,9 @@ struct EditProfileView: View {
     @State private var ageMax: Int
     @State private var maxDistanceKm: Double
     @State private var flexibleDiscovery: Bool
+    @State private var heightCm: Int?
+    @State private var showsHeight = true
+    @State private var heightLoaded = false
     @State private var isSaving = false
     @State private var errorMessage: String?
 
@@ -36,6 +39,24 @@ struct EditProfileView: View {
                     TextField("One line about you", text: $bio, axis: .vertical)
                         .lineLimit(2...4)
                 }
+
+                Section {
+                    Picker("Height", selection: $heightCm) {
+                        Text("Not set").tag(Int?.none)
+                        ForEach(Array(HeightSetting.range.reversed()), id: \.self) { cm in
+                            Text(HeightSetting.label(cm)).tag(Int?.some(cm))
+                        }
+                    }
+                    .accessibilityIdentifier("edit.height")
+                    Toggle("Show my height", isOn: $showsHeight)
+                        .tint(Palette.mint)
+                        .disabled(heightCm == nil)
+                } header: {
+                    Text("Height")
+                } footer: {
+                    Text("Shown on your profile while people watch your clips. Turn it off and it stays private.")
+                }
+                .disabled(!heightLoaded)
 
                 Section("Show me") {
                     ForEach(Gender.allCases) { gender in
@@ -77,6 +98,12 @@ struct EditProfileView: View {
             }
             .scrollContentBackground(.hidden)
             .background(Palette.midnight)
+            .task {
+                guard !heightLoaded, let height = try? await app.backend.fetchMyHeight() else { return }
+                heightCm = height.heightCm
+                showsHeight = height.isSet ? height.isShown : true
+                heightLoaded = true
+            }
             .navigationTitle("Edit profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -108,6 +135,9 @@ struct EditProfileView: View {
         )
         do {
             try await app.backend.updateProfile(update)
+            if heightLoaded {
+                try await app.backend.setHeight(HeightSetting(heightCm: heightCm, isShown: showsHeight && heightCm != nil))
+            }
             await app.refreshProfile()
             dismiss()
         } catch {

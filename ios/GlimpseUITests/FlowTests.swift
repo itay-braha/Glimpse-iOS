@@ -106,6 +106,9 @@ final class FlowTests: XCTestCase {
         app.staticTexts["The basics"].tap()
         app.buttons["Man"].tap()
         app.buttons["Women"].tap()
+        // Height: a number, or choose not to show it. Until then, Continue waits.
+        XCTAssertFalse(app.buttons["Continue"].isEnabled)
+        app.buttons["height.hide"].tap()
         snap("1-4 Profile basics")
         app.buttons["Continue"].tap()
 
@@ -125,6 +128,8 @@ final class FlowTests: XCTestCase {
         XCTAssertTrue(app.buttons["Glimpse"].firstMatch.waitForExistence(timeout: 20))
         pause(4)
         snap("1-6 Feed")
+        // Other people's height shows on their card while you watch.
+        XCTAssertTrue(app.descendants(matching: .any)["card.height"].firstMatch.waitForExistence(timeout: 5))
     }
 
     // A -> D: at 15/15 a like becomes a choice, then a match, then a conversation.

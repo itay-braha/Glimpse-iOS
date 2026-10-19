@@ -113,7 +113,9 @@ enum DemoData {
                 ] + (index == 0 ? [embed(91, platform: .tiktok, importedDaysAgo: 6, now: now)] : []),
                 // Like the server: widened suggestions come last, and say so.
                 discoveryNote: index == people.count - 1 ? .widerDistance
-                    : index == people.count - 2 ? .secondLook : nil
+                    : index == people.count - 2 ? .secondLook : nil,
+                // Most show their height; every fourth chose not to.
+                heightCm: index % 4 == 3 ? nil : 160 + (index * 7) % 26
             )
         }
     }
