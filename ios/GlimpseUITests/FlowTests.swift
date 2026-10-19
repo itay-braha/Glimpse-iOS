@@ -170,6 +170,7 @@ final class FlowTests: XCTestCase {
         suggest.tap()
 
         let slot = app.buttons["In 30 minutes"]
+        XCTAssertTrue(app.buttons["Right now"].waitForExistence(timeout: 5), "anyone can suggest right now")
         XCTAssertTrue(slot.waitForExistence(timeout: 8))
         snap("3-2 Suggest a time")
         slot.tap()

@@ -280,7 +280,7 @@ struct ChatView: View {
             }
         }
         .sheet(isPresented: $showPropose) {
-            VibeProposeSheet(name: model.match.displayName, allowNow: model.vibe?.iHoldKey == true) { date in
+            VibeProposeSheet(name: model.match.displayName, isKeyHolder: model.vibe?.iHoldKey == true) { date in
                 Task {
                     await model.vibeAction(using: app.backend) {
                         try await app.backend.vibePropose(matchID: model.match.matchID, at: date)

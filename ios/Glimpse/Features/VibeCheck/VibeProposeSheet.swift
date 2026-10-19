@@ -1,23 +1,22 @@
 import SwiftUI
 
-/// Pick a time for the Vibe Check. Key holders may also invite "right now";
-/// everyone else can only suggest a window at least 15 minutes out.
+/// Pick a time for the Vibe Check, "right now" included. It's a suggestion either
+/// way: the call only starts once the other person accepts.
 struct VibeProposeSheet: View {
     let name: String
-    let allowNow: Bool
+    /// Whether I unlocked the Vibe Check (changes only the explanation below).
+    let isKeyHolder: Bool
     let onPick: (Date) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var custom = Date.now.addingTimeInterval(3_600)
 
-    private var earliest: Date {
-        allowNow ? .now : Date.now.addingTimeInterval(15 * 60)
-    }
+    private var earliest: Date { .now }
 
     private var suggestions: [(String, Date)] {
         let calendar = Calendar.current
         var result: [(String, Date)] = []
-        if allowNow { result.append(("Right now", .now)) }
+        result.append(("Right now", .now))
         result.append(("In 30 minutes", Date.now.addingTimeInterval(30 * 60)))
         if let tonight = calendar.date(bySettingHour: 20, minute: 0, second: 0, of: .now), tonight > earliest {
             result.append(("Tonight at 8:00 PM", tonight))
@@ -37,9 +36,9 @@ struct VibeProposeSheet: View {
                         Button(suggestion.0) { pick(suggestion.1) }
                     }
                 } footer: {
-                    Text(allowNow
+                    Text(isKeyHolder
                          ? String(localized: "\(name) gets a notification and joins a short lobby with you before the call starts.")
-                         : String(localized: "\(name) confirms the time. Nobody gets an unexpected ring."))
+                         : String(localized: "\(name) accepts first, even for right now. Nobody gets an unexpected ring."))
                 }
                 Section("Another time") {
                     DatePicker("Time", selection: $custom, in: earliest...Date.now.addingTimeInterval(7 * 86_400))

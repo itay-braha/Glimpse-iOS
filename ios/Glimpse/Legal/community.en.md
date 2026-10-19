@@ -1,4 +1,4 @@
-Glimpse is a dating club built on respect and real effort. These rules keep it that way. Breaking them can get your content hidden or your account removed, permanently.
+Glimpse is a dating app built on respect, safety and real effort. These rules keep it that way. Breaking them can get your content hidden or your account removed, permanently.
 
 ## Be real
 Only post videos of yourself, from your own life. No impersonation, no stolen content, no AI-generated or deepfake media, no misleading edits. One account per person.

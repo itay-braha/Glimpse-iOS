@@ -21,7 +21,7 @@ struct WelcomeView: View {
                     .foregroundStyle(Palette.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Text("A dating club for people who'd rather meet than swipe.")
+                Text("Dating built around your safety, for people who'd rather meet than swipe.")
                     .font(.title3)
                     .foregroundStyle(Palette.textSecondary)
                     .padding(.top, 12)
@@ -32,7 +32,7 @@ struct WelcomeView: View {
                     ValueProp(symbol: "circle.dashed", tint: Palette.pink,
                               title: "15 connections, max", detail: "Quiet chats make room for new ones.")
                     ValueProp(symbol: "checkmark.shield.fill", tint: Color(hex: 0x7AF0FF),
-                              title: "Verified humans", detail: "Real numbers, real devices, no catfish.")
+                              title: "Safety first", detail: "Real numbers and real devices. Reports are handled right away, and anyone reported for unsafe behaviour is held at once.")
                     ValueProp(symbol: "eye.slash.fill", tint: Palette.violet,
                               title: "Private by design", detail: "No screen recording anywhere in Glimpse, and no screenshots during Vibe Checks.")
                 }

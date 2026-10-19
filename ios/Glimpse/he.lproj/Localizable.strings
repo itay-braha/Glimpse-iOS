@@ -190,7 +190,6 @@
 "3-Minute Vibe Check" = "Vibe Check של 3 דקות";
 "A clip from your camera roll. Up to 15 seconds, private to Glimpse." = "קליפ מגלריית התמונות. עד 15 שניות, נשמר באופן פרטי ב-Glimpse.";
 "A connection ended" = "קשר הסתיים";
-"A dating club for people who'd rather meet than swipe." = "מועדון היכרויות למי שמעדיפים להיפגש ולא רק להחליק.";
 "A first date idea for you two" = "רעיון לדייט ראשון בשבילכם";
 "A heads-up before your Vibe Check?" = "תזכורת לפני ה-Vibe Check?";
 "A little further than usual" = "קצת יותר רחוק מהרגיל";
@@ -1105,3 +1104,9 @@
 "Not set" = "לא הוגדר";
 "Show my height" = "להציג את הגובה שלי";
 "Shown on your profile while people watch your clips. Turn it off and it stays private." = "מוצג בפרופיל שלך בזמן שצופים בקליפים שלך. אם מכבים, הוא נשאר פרטי.";
+"Dating built around your safety, for people who'd rather meet than swipe." = "היכרויות שבנויות סביב הביטחון שלך, למי שמעדיפים להיפגש ולא רק להחליק.";
+"Safety first" = "הביטחון שלך קודם";
+"Real numbers and real devices. Reports are handled right away, and anyone reported for unsafe behaviour is held at once." = "מספרים אמיתיים ומכשירים אמיתיים. דיווחים מטופלים מיד, ומי שדווח על התנהגות לא בטוחה מושהה מיד.";
+"%@ accepts first, even for right now. Nobody gets an unexpected ring." = "%1$@ מאשר/ת קודם, גם כשזה עכשיו. אף אחד לא מקבל שיחה בהפתעה.";
+"%lld accepts first, even for right now. Nobody gets an unexpected ring." = "%1$lld מאשר/ת קודם, גם כשזה עכשיו. אף אחד לא מקבל שיחה בהפתעה.";
+"%lf accepts first, even for right now. Nobody gets an unexpected ring." = "%1$lf מאשר/ת קודם, גם כשזה עכשיו. אף אחד לא מקבל שיחה בהפתעה.";
