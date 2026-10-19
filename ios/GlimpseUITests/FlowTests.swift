@@ -477,24 +477,26 @@ final class FlowTests: XCTestCase {
         snap("7-1 First-time tips")
         gotIt.tap()
 
+        // Tap near the edges: on a linked TikTok/Instagram clip only a 30-pt strip at each
+        // side changes clips (the middle belongs to that player).
         let window = app.windows.firstMatch
         XCTAssertTrue(app.buttons["Glimpse"].firstMatch.waitForExistence(timeout: 10))
         let first = currentName(app)
         // Start from her first clip (the clip timer may already have moved on).
         for _ in 0..<4 where clipNumber(app) > 1 {
-            window.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.42)).tap()
+            window.coordinate(withNormalizedOffset: CGVector(dx: 0.03, dy: 0.42)).tap()
             pause(0.8)
         }
         let start = clipNumber(app)
         XCTAssertTrue(start == 1 || start == 2)
         snap("7-2 Clip 1 of 3")
 
-        window.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.42)).tap()
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.42)).tap()
         pause(0.8)
         XCTAssertEqual(clipNumber(app), start + 1)
         snap("7-3 Tap right: next clip")
 
-        window.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.42)).tap()
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.03, dy: 0.42)).tap()
         pause(0.8)
         XCTAssertEqual(clipNumber(app), start)
 
