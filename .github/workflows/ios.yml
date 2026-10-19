@@ -99,6 +99,8 @@ jobs:
       - name: Shrink screenshots
         if: always()
         run: |
+          # Keep images only: Xcode also attaches its own screen recordings of failed tests.
+          find ui-flows -type f ! -name "*.png" -delete 2>/dev/null || true
           for f in ui-flows/*.png screenshots/*.png; do
             [ -f "$f" ] || continue
             sips -Z 1000 -s format jpeg -s formatOptions 75 "$f" --out "${f%.png}.jpg" >/dev/null && rm "$f"
