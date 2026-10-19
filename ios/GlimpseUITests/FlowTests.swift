@@ -485,13 +485,15 @@ final class FlowTests: XCTestCase {
         let window = app.windows.firstMatch
         XCTAssertTrue(app.buttons["Glimpse"].firstMatch.waitForExistence(timeout: 10))
         let first = currentName(app)
-        // Start from her first clip (the clip timer may already have moved on).
-        for _ in 0..<4 where clipNumber(app) > 1 {
+        // Back to her first clip. Tap twice without reading in between: on a slow simulator
+        // each read takes seconds, and reading in a loop let the 12-second clip timer win.
+        // (Each tap restarts the clip timer, so the single read below is in time.)
+        for _ in 0..<2 {
             window.coordinate(withNormalizedOffset: CGVector(dx: 0.03, dy: 0.42)).tap()
-            pause(0.8)
+            pause(0.6)
         }
         let start = clipNumber(app)
-        XCTAssertTrue(start == 1 || start == 2)
+        XCTAssertEqual(start, 1)
         snap("7-2 Clip 1 of 3")
 
         window.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.42)).tap()
