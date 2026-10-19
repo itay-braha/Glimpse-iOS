@@ -19,7 +19,7 @@ struct ExitSurveySheet: View {
                 } header: {
                     Text("Why did this connection end?")
                 } footer: {
-                    Text("Only Glimpse sees this. \(name) is never told, and it helps keep ghosters and catfish out.")
+                    Text("Only Glimpse sees this. \(name) is never told. It helps us suggest better matches.")
                 }
             }
             .scrollContentBackground(.hidden)

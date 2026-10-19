@@ -1,22 +1,23 @@
 import Foundation
 
-/// Private answer to "Why did this connection end?" (never shown to anyone).
+/// Private answer to "Why did this connection end?" (never shown to anyone). It only
+/// feeds the behavioral score; "Ghosted" on its own never leads to a penalty.
 enum ExitReason: String, CaseIterable, Identifiable, Sendable {
+    case noChemistry = "no_chemistry"
     case conversationDied = "conversation_died"
-    case flakedOnDate = "flaked_on_date"
-    case didntLookLikeVideo = "didnt_look_like_video"
+    case ghosted
     case inappropriate
-    case notFeelingIt = "not_feeling_it"
+    case didntLookLikeVideo = "didnt_look_like_video"
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
-        case .conversationDied: String(localized: "The conversation died")
-        case .flakedOnDate: String(localized: "They flaked on a date")
+        case .noChemistry: String(localized: "No chemistry")
+        case .conversationDied: String(localized: "Conversation died")
+        case .ghosted: String(localized: "Ghosted / Disappeared")
+        case .inappropriate: String(localized: "Inappropriate behavior")
         case .didntLookLikeVideo: String(localized: "They didn't look like their videos")
-        case .inappropriate: String(localized: "They were inappropriate")
-        case .notFeelingIt: String(localized: "I just wasn't feeling it")
         }
     }
 }

@@ -1110,3 +1110,11 @@
 "%@ accepts first, even for right now. Nobody gets an unexpected ring." = "%1$@ מאשר/ת קודם, גם כשזה עכשיו. אף אחד לא מקבל שיחה בהפתעה.";
 "%lld accepts first, even for right now. Nobody gets an unexpected ring." = "%1$lld מאשר/ת קודם, גם כשזה עכשיו. אף אחד לא מקבל שיחה בהפתעה.";
 "%lf accepts first, even for right now. Nobody gets an unexpected ring." = "%1$lf מאשר/ת קודם, גם כשזה עכשיו. אף אחד לא מקבל שיחה בהפתעה.";
+"No, they stood me up" = "לא, הבריזו לי";
+"No chemistry" = "אין כימיה";
+"Conversation died" = "השיחה דעכה";
+"Ghosted / Disappeared" = "גוסטינג / נעלמו";
+"Inappropriate behavior" = "התנהגות לא הולמת";
+"Only Glimpse sees this. %@ is never told. It helps us suggest better matches." = "רק Glimpse רואה את זה. %1$@ לא יידע/תדע. זה עוזר לנו להציע התאמות טובות יותר.";
+"Only Glimpse sees this. %lld is never told. It helps us suggest better matches." = "רק Glimpse רואה את זה. %1$lld לא יידע/תדע. זה עוזר לנו להציע התאמות טובות יותר.";
+"Only Glimpse sees this. %lf is never told. It helps us suggest better matches." = "רק Glimpse רואה את זה. %1$lf לא יידע/תדע. זה עוזר לנו להציע התאמות טובות יותר.";
