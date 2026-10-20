@@ -65,6 +65,7 @@ struct KindGoodbyeSheet: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .interactiveDismissDisabled(editing)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("goodbye.sheet")
     }
 

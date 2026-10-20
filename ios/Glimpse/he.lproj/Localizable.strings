@@ -1248,3 +1248,5 @@
 "%@ m away" = "%1$@ מ׳ ממך";
 "%lld m away" = "%1$lld מ׳ ממך";
 "%lf m away" = "%1$lf מ׳ ממך";
+"Dating built around your safety." = "היכרויות שבנויות סביב הביטחון שלך.";
+"Real numbers, real devices. Reports are handled right away." = "מספרים אמיתיים, מכשירים אמיתיים. דיווחים מטופלים מיד.";

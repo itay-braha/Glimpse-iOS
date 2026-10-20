@@ -114,6 +114,7 @@ struct DealsView: View {
         }
         .scrollContentBackground(.hidden)
         .listRowBackground(Palette.surface)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("deals.list")
     }
 }
@@ -272,6 +273,7 @@ private struct DealUnavailableView: View {
                     Text(message).font(.subheadline).foregroundStyle(Palette.textSecondary)
                 }
                 .padding(.vertical, 8)
+                .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("deal.unavailable")
             }
             .listRowBackground(Color.clear)
@@ -316,6 +318,7 @@ private struct DealRedeemedView: View {
                 .buttonStyle(GlimpseButtonStyle(kind: .primary))
         }
         .padding(24)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("deal.redeemed")
     }
 }

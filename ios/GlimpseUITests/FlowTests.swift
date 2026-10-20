@@ -369,7 +369,11 @@ final class FlowTests: XCTestCase {
 
         app.tabBars.buttons["Connections"].tap()
         let hila = app.cells.containing(NSPredicate(format: "label CONTAINS 'Hila'")).firstMatch
-        XCTAssertTrue(hila.waitForExistence(timeout: 15))
+        // The list loads rows as they scroll in; the deals card can push her below the fold.
+        for _ in 0..<3 where !hila.waitForExistence(timeout: 5) {
+            app.swipeUp()
+        }
+        XCTAssertTrue(hila.waitForExistence(timeout: 10))
         // Hold for actions: pin, freeze, unmatch, report.
         hila.press(forDuration: 1.2)
         let pin = app.buttons["Pin"]

@@ -37,6 +37,7 @@ struct DealPassView: View {
         } message: {
             Text("Only staff at \(deal.place) should tap this. It can't be undone.")
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("deal.pass")
     }
 
