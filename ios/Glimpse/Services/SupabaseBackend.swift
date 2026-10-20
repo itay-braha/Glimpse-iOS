@@ -366,6 +366,26 @@ final class SupabaseBackend: GlimpseBackend {
         )).execute()
     }
 
+    func dealsNear() async throws -> [Deal] {
+        try await client.rpc("deals_near").execute().value
+    }
+
+    func logDeal(_ dealID: UUID, kind: DealLogKind, near: Bool?, band: DistanceBand?) async {
+        _ = try? await client.rpc("deal_log", params: DealLogParams(
+            deal: dealID, kind: kind.rawValue, near: near, distance: band?.rawValue
+        )).execute()
+    }
+
+    func openDeal(_ dealID: UUID, near: Bool?, band: DistanceBand) async throws -> DealOpenResult {
+        try await mapLimits { () async throws -> DealOpenResult in
+            try await client.rpc("deal_open", params: DealOpenParams(deal: dealID, near: near, distance: band.rawValue)).execute().value
+        }
+    }
+
+    func redeemDeal(passID: UUID) async throws -> DealRedeemResult {
+        try await client.rpc("deal_redeem", params: ["p_pass": passID.uuidString]).execute().value
+    }
+
     func submitExitFeedback(matchID: UUID, reason: ExitReason) async throws {
         try await client.rpc(
             "submit_exit_feedback",
@@ -1114,6 +1134,47 @@ private struct ProposeDateParams: Encodable, Sendable {
         case match = "p_match"
         case suggestion = "p_suggestion"
         case at = "p_at"
+    }
+}
+
+private struct DealLogParams: Encodable, Sendable {
+    let deal: UUID
+    let kind: String
+    let near: Bool?
+    let distance: String?
+
+    enum CodingKeys: String, CodingKey {
+        case deal = "p_deal"
+        case kind = "p_kind"
+        case near = "p_near"
+        case distance = "p_distance"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(deal, forKey: .deal)
+        try container.encode(kind, forKey: .kind)
+        try container.encode(near, forKey: .near)
+        try container.encode(distance, forKey: .distance)
+    }
+}
+
+private struct DealOpenParams: Encodable, Sendable {
+    let deal: UUID
+    let near: Bool?
+    let distance: String
+
+    enum CodingKeys: String, CodingKey {
+        case deal = "p_deal"
+        case near = "p_near"
+        case distance = "p_distance"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(deal, forKey: .deal)
+        try container.encode(near, forKey: .near)
+        try container.encode(distance, forKey: .distance)
     }
 }
 

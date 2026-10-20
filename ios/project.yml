@@ -81,6 +81,8 @@ targets:
         NSMicrophoneUsageDescription: Glimpse uses the microphone for your profile moments, voice and video messages, and Vibe Check calls.
         NSLocationWhenInUseUsageDescription: Glimpse uses your approximate location to show people nearby and how far away they are. Your exact location is never shared.
         NSLocationDefaultAccuracyReduced: true
+        NSLocationTemporaryUsageDescriptionDictionary:
+          DealCheckIn: Glimpse checks you're at the place to unlock the deal. Your exact location stays on your phone.
         CFBundleURLTypes:
           - CFBundleURLName: com.itaybraha.glimpse
             CFBundleURLSchemes: [glimpse]

@@ -15,6 +15,11 @@ actor DemoBackend: GlimpseBackend {
     private var goodbyeShown: [UUID: Date] = [:]
     private var goodbyeAnswers: [UUID: GoodbyeAction] = [:]
     private var goodbyeMatches: [UUID: UUID] = [:]
+    // Coffee deals: the same rules as the server (cap, once a week per place).
+    private var dealRedemptions: [UUID: Int] = [:]
+    private var myRedemptions: [UUID: Date] = [:]
+    private var dealPasses: [UUID: UUID] = [:]
+    private var dealLog: [(UUID, String)] = []
     private var friendlyVibes: Set<UUID> = []
     private var videos: [ProfileVideo]
     private var candidates: [FeedProfile]
@@ -538,6 +543,65 @@ actor DemoBackend: GlimpseBackend {
     }
 
     func submitExitFeedback(matchID: UUID, reason: ExitReason) {}
+
+    /// (deal, cap, already given out before the demo starts)
+    private static let demoDeals: [(deal: Deal, limit: Int?, given: Int)] = [
+        (Deal(id: DemoData.id(9_101), spotID: DemoData.id(9_001), place: "Lumen Café (demo)", category: .cafe,
+              address: "12 Example St", latitude: 32.07, longitude: 34.775, title: "10% off two coffees",
+              details: "For you and your date, any hot drink", terms: "Once a week. Not with other offers.",
+              state: .available, distanceKm: 1.2), 50, 12),
+        (Deal(id: DemoData.id(9_102), spotID: DemoData.id(9_003), place: "Little Lantern Bar (demo)", category: .bar,
+              address: "4 Sample Ave", latitude: 32.06, longitude: 34.78, title: "A free glass of house wine",
+              details: "With any drink, from 6 PM", terms: "Over 18. Once a week.",
+              state: .available, distanceKm: 0.8), 8, 2),
+        (Deal(id: DemoData.id(9_103), spotID: DemoData.id(9_004), place: "Sweet Spot (demo)", category: .dessert,
+              address: "7 Demo Blvd", latitude: 32.075, longitude: 34.79, title: "Two scoops for one",
+              details: nil, terms: nil, state: .available, distanceKm: 2.6), 30, 30),
+    ]
+
+    private func demoDealState(_ entry: (deal: Deal, limit: Int?, given: Int)) -> Deal {
+        var deal = entry.deal
+        let used = dealRedemptions[deal.id, default: 0] + entry.given
+        if let limit = entry.limit, used >= limit {
+            deal.state = .soldOut
+        } else if let last = myRedemptions[deal.id], last > .now.addingTimeInterval(-7 * 86_400) {
+            deal.state = .used
+            deal.availableAgainAt = last.addingTimeInterval(7 * 86_400)
+        }
+        if let limit = entry.limit, limit - used <= 10 { deal.remaining = max(limit - used, 0) }
+        return deal
+    }
+
+    func dealsNear() -> [Deal] {
+        Self.demoDeals.map(demoDealState).sorted { ($0.distanceKm ?? .infinity) < ($1.distanceKm ?? .infinity) }
+    }
+
+    func logDeal(_ dealID: UUID, kind: DealLogKind, near: Bool?, band: DistanceBand?) {
+        dealLog.append((dealID, kind.rawValue))
+    }
+
+    func openDeal(_ dealID: UUID, near: Bool?, band: DistanceBand) throws -> DealOpenResult {
+        guard let entry = Self.demoDeals.first(where: { $0.deal.id == dealID }) else {
+            throw GlimpseError.message("That deal isn't available any more.")
+        }
+        let deal = demoDealState(entry)
+        dealLog.append((dealID, deal.state == .available ? "opened" : deal.state.rawValue))
+        guard deal.state == .available else { return DealOpenResult(status: deal.state, deal: deal) }
+        let pass = DealPass(id: UUID(), expiresAt: .now.addingTimeInterval(15 * 60), code: "M1NT",
+                            name: profile?.displayName ?? "You")
+        dealPasses[pass.id] = dealID
+        return DealOpenResult(status: .available, deal: deal, pass: pass)
+    }
+
+    func redeemDeal(passID: UUID) throws -> DealRedeemResult {
+        guard let dealID = dealPasses.removeValue(forKey: passID) else {
+            return DealRedeemResult(status: .expired)
+        }
+        dealRedemptions[dealID, default: 0] += 1
+        myRedemptions[dealID] = .now
+        dealLog.append((dealID, "redeemed"))
+        return DealRedeemResult(status: .redeemed, redeemedAt: .now)
+    }
 
     /// Like the server: a real conversation, once per chat, at most once a week (3 days
     /// when unmatching), and only when there's a reason (no spark, gone quiet, they wrote last).

@@ -220,6 +220,33 @@ final class FlowTests: XCTestCase {
         snap("3-9 Vibe Verified")
     }
 
+    // Coffee deals: list, "are you here?", the live pass, staff redeem.
+    func testCoffeeDeal() {
+        let app = launch("connections")
+        let entry = app.buttons["matches.deals"]
+        XCTAssertTrue(entry.waitForExistence(timeout: 20))
+        entry.tap()
+        XCTAssertTrue(text(app, containing: "10% off two coffees").waitForExistence(timeout: 10))
+        pause(1)
+        snap("14-1 Coffee deals near you")
+        button(app, containing: "10% off two coffees").tap()
+        // The demo has no location, so it asks.
+        let here = app.buttons["deal.imHere"]
+        XCTAssertTrue(here.waitForExistence(timeout: 10))
+        snap("14-2 Are you at the café?")
+        here.tap()
+        let redeem = app.buttons["deal.redeem"]
+        XCTAssertTrue(redeem.waitForExistence(timeout: 10))
+        pause(1)
+        snap("14-3 The live pass")
+        redeem.tap()
+        let confirm = app.buttons["Redeem"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        confirm.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["deal.redeemed"].waitForExistence(timeout: 10))
+        snap("14-4 Redeemed")
+    }
+
     // A -> D: freemium "Liked you": teaser, free daily reveal, Glimpse+.
     func testLikedYouIsFree() {
         let app = launch("likes")

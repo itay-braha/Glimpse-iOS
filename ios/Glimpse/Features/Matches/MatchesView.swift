@@ -9,6 +9,8 @@ struct MatchesView: View {
     @State private var goodbyeMatch: MatchSummary?
     @State private var goodbyeAnswered = false
     @State private var goodbyePromptID: UUID?
+    @State private var showDeals = false
+    @State private var dealsAvailable = 0
     @State private var exitSurveyFor: MatchSummary?
     @State private var reportTarget: MatchSummary?
 
@@ -26,6 +28,15 @@ struct MatchesView: View {
                             LikedYouCard(count: model.likesTotal)
                         }
                         .buttonStyle(.plain)
+                    }
+                    if dealsAvailable > 0 {
+                        Button {
+                            showDeals = true
+                        } label: {
+                            DealsCard(count: dealsAvailable)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("matches.deals")
                     }
                 }
                 .listRowBackground(Color.clear)
@@ -177,6 +188,12 @@ struct MatchesView: View {
                 }
             }
         }
+        .sheet(isPresented: $showDeals, onDismiss: {
+            Task { dealsAvailable = await countDeals() }
+        }) {
+            DealsView()
+        }
+        .task { dealsAvailable = await countDeals() }
         .task(id: app.matchesVersion) {
             await model.load(using: app.backend)
             app.openLaunchChatIfNeeded(from: model.pinnedMatches + model.conversations)
@@ -214,6 +231,10 @@ struct MatchesView: View {
             freezeButton(match)
                 .tint(Color(hex: 0x7AF0FF))
         }
+    }
+
+    private func countDeals() async -> Int {
+        ((try? await app.backend.dealsNear()) ?? []).filter { $0.state == .available }.count
     }
 
     /// A kind goodbye first when it fits (the server decides), otherwise the usual confirmation.
@@ -532,5 +553,38 @@ private struct DateChip: View {
         .padding(.vertical, 3)
         .background((date.status == .confirmed ? Palette.mint : Palette.amber).opacity(0.15), in: .capsule)
         .accessibilityIdentifier("matches.dateChip")
+    }
+}
+
+/// "Coffee deals near you" at the top of Connections.
+private struct DealsCard: View {
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "cup.and.saucer.fill")
+                .font(.title3)
+                .foregroundStyle(Palette.onMint)
+                .frame(width: 44, height: 44)
+                .background(Palette.mint.gradient, in: .circle)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Coffee deals near you")
+                    .font(.glimpseHeadline)
+                    .foregroundStyle(Palette.textPrimary)
+                Text(count == 1 ? String(localized: "1 place · show your phone at the counter")
+                                : String(localized: "\(count) places · show your phone at the counter"))
+                    .font(.subheadline)
+                    .foregroundStyle(Palette.textSecondary)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.forward")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(Palette.textTertiary)
+        }
+        .padding(14)
+        .background(Palette.surface, in: .rect(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Palette.mint.opacity(0.3)))
+        .accessibilityElement(children: .combine)
     }
 }

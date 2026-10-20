@@ -75,6 +75,14 @@ protocol GlimpseBackend: AnyObject, Sendable {
     func setPinned(_ matchID: UUID, pinned: Bool) async throws
     func pinnedMatchIDs() async throws -> Set<UUID>
     func submitExitFeedback(matchID: UUID, reason: ExitReason) async throws
+
+    // MARK: Coffee deals
+    func dealsNear() async throws -> [Deal]
+    func logDeal(_ dealID: UUID, kind: DealLogKind, near: Bool?, band: DistanceBand?) async
+    /// Opens the live pass (or says why not). `near` is the phone's own check; nil = unknown.
+    func openDeal(_ dealID: UUID, near: Bool?, band: DistanceBand) async throws -> DealOpenResult
+    /// Staff tapped Redeem on the member's phone.
+    func redeemDeal(passID: UUID) async throws -> DealRedeemResult
     /// Whether to offer a kind goodbye here (the server decides, and records the offer).
     func goodbyeOffer(matchID: UUID, context: GoodbyeContext) async throws -> GoodbyeOffer
     /// What they did with it; `.sent` closes the chat and delivers the note.

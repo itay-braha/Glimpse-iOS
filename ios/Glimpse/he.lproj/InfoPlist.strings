@@ -3,3 +3,4 @@
 "NSCameraUsageDescription" = "‏Glimpse משתמשת במצלמה לרגעים בפרופיל, להודעות וידאו בצ׳אט ולשיחות Vibe Check.";
 "NSMicrophoneUsageDescription" = "‏Glimpse משתמשת במיקרופון לרגעים בפרופיל, להודעות קוליות ווידאו ולשיחות Vibe Check.";
 "NSLocationWhenInUseUsageDescription" = "‏Glimpse משתמשת במיקום המשוער שלך כדי להציג אנשים בסביבה ואת המרחק אליהם. המיקום המדויק שלך אף פעם לא משותף.";
+"DealCheckIn" = "‏Glimpse בודקת שאת/ה במקום כדי לפתוח את הדיל. המיקום המדויק שלך נשאר בטלפון.";
