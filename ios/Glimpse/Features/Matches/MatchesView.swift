@@ -4,6 +4,11 @@ struct MatchesView: View {
     @Environment(AppModel.self) private var app
     @State private var model = MatchesModel()
     @State private var pendingUnmatch: MatchSummary?
+    /// A kind-goodbye offer for the connection being unmatched.
+    @State private var goodbye: GoodbyeOffer?
+    @State private var goodbyeMatch: MatchSummary?
+    @State private var goodbyeAnswered = false
+    @State private var goodbyePromptID: UUID?
     @State private var exitSurveyFor: MatchSummary?
     @State private var reportTarget: MatchSummary?
 
@@ -133,15 +138,7 @@ struct MatchesView: View {
                 presenting: pendingUnmatch
             ) { match in
                 Button("Unmatch", role: .destructive) {
-                    Task {
-                        await model.unmatch(match, using: app.backend)
-                        // Only after a real conversation, and at most once a week.
-                        if match.messageCount >= 3, SurveyPacing.mayAsk() {
-                            SurveyPacing.recordAsked()
-                            exitSurveyFor = match
-                        }
-                        app.matchesDidChange()
-                    }
+                    Task { await unmatchNow(match) }
                 }
             } message: { _ in
                 Text("This frees a spot. You won't see each other again.")
@@ -157,6 +154,21 @@ struct MatchesView: View {
                 },
                 onDone: { app.matchesDidChange() }
             )
+        }
+        .sheet(item: $goodbye, onDismiss: {
+            // Swiped away without choosing counts as "not now".
+            if let match = goodbyeMatch, !goodbyeAnswered { answerGoodbye(match, .dismissed) }
+        }) { offer in
+            if let match = goodbyeMatch {
+                KindGoodbyeSheet(
+                    name: match.displayName,
+                    trigger: offer.trigger ?? .unmatchAfterTheirMessage,
+                    onSend: { template, note, edited in
+                        answerGoodbye(match, .sent, template: template, note: note, edited: edited)
+                    },
+                    onDecline: { action in answerGoodbye(match, action) }
+                )
+            }
         }
         .sheet(item: $exitSurveyFor) { match in
             ExitSurveySheet(name: match.displayName) { reason in
@@ -193,7 +205,7 @@ struct MatchesView: View {
         .contextMenu { actions(for: match) }
         .swipeActions(edge: .trailing) {
             Button("Unmatch", systemImage: "xmark.circle", role: .destructive) {
-                pendingUnmatch = match
+                Task { await startUnmatch(match) }
             }
         }
         .swipeActions(edge: .leading) {
@@ -204,6 +216,48 @@ struct MatchesView: View {
         }
     }
 
+    /// A kind goodbye first when it fits (the server decides), otherwise the usual confirmation.
+    private func startUnmatch(_ match: MatchSummary) async {
+        if let offer = try? await app.backend.goodbyeOffer(matchID: match.matchID, context: .unmatch),
+           offer.show, offer.promptID != nil {
+            goodbyeAnswered = false
+            goodbyeMatch = match
+            goodbyePromptID = offer.promptID
+            goodbye = offer
+        } else {
+            pendingUnmatch = match
+        }
+    }
+
+    private func unmatchNow(_ match: MatchSummary) async {
+        await model.unmatch(match, using: app.backend)
+        // Only after a real conversation, and at most once a week.
+        if match.messageCount >= 3, SurveyPacing.mayAsk() {
+            SurveyPacing.recordAsked()
+            exitSurveyFor = match
+        }
+        app.matchesDidChange()
+    }
+
+    private func answerGoodbye(_ match: MatchSummary, _ action: GoodbyeAction,
+                               template: GoodbyeTemplate? = nil, note: String? = nil, edited: Bool = false) {
+        guard let promptID = goodbyePromptID else { return }
+        goodbyeAnswered = true
+        app.track("goodbye_\(action.rawValue)", ["trigger": GoodbyeTrigger.unmatchAfterTheirMessage.rawValue])
+        Task {
+            try? await app.backend.goodbyeRespond(promptID: promptID, action: action, template: template, note: note, edited: edited)
+            switch action {
+            case .sent:
+                app.matchesDidChange()
+            case .unmatchedWithoutNote:
+                try? await Task.sleep(for: .milliseconds(500))
+                await unmatchNow(match)
+            case .dismissed, .keptChatting:
+                break
+            }
+        }
+    }
+
     /// Long-press on anyone in Connections.
     @ViewBuilder
     private func actions(for match: MatchSummary) -> some View {
@@ -211,7 +265,7 @@ struct MatchesView: View {
         freezeButton(match)
         Divider()
         Button("Unmatch", systemImage: "xmark.circle", role: .destructive) {
-            pendingUnmatch = match
+            Task { await startUnmatch(match) }
         }
         Button("Report or block", systemImage: "flag", role: .destructive) {
             reportTarget = match

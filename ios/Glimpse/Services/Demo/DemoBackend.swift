@@ -12,6 +12,10 @@ actor DemoBackend: GlimpseBackend {
     private var signedIn: Bool
     private var profile: UserProfile?
     private var height = HeightSetting.unanswered
+    private var goodbyeShown: [UUID: Date] = [:]
+    private var goodbyeAnswers: [UUID: GoodbyeAction] = [:]
+    private var goodbyeMatches: [UUID: UUID] = [:]
+    private var friendlyVibes: Set<UUID> = []
     private var videos: [ProfileVideo]
     private var candidates: [FeedProfile]
     private var likedMe: Set<UUID>
@@ -535,6 +539,41 @@ actor DemoBackend: GlimpseBackend {
 
     func submitExitFeedback(matchID: UUID, reason: ExitReason) {}
 
+    /// Like the server: a real conversation, once per chat, at most once a week (3 days
+    /// when unmatching), and only when there's a reason (no spark, gone quiet, they wrote last).
+    func goodbyeOffer(matchID: UUID, context: GoodbyeContext) -> GoodbyeOffer {
+        let chat = messages[matchID] ?? []
+        guard matches.contains(where: { $0.matchID == matchID }), chat.count >= 6,
+              goodbyeShown[matchID] == nil else { return .none }
+        let cooldown: TimeInterval = (context == .unmatch ? 3 : 7) * 86_400
+        if let latest = goodbyeShown.values.max(), latest > .now.addingTimeInterval(-cooldown) { return .none }
+        let last = chat.max { $0.createdAt < $1.createdAt }
+        let theyWroteLast = last.map { $0.senderID != me } ?? false
+        let trigger: GoodbyeTrigger?
+        switch context {
+        case .unmatch:
+            trigger = theyWroteLast ? .unmatchAfterTheirMessage : nil
+        case .chatOpen:
+            if friendlyVibes.contains(matchID) {
+                trigger = .vibeNoSpark
+            } else if theyWroteLast, let last, last.createdAt < .now.addingTimeInterval(-72 * 3_600) {
+                trigger = .stoppedReplying
+            } else {
+                trigger = nil
+            }
+        }
+        guard let trigger else { return .none }
+        goodbyeShown[matchID] = .now
+        let promptID = UUID()
+        goodbyeMatches[promptID] = matchID
+        return GoodbyeOffer(show: true, promptID: promptID, trigger: trigger)
+    }
+
+    func goodbyeRespond(promptID: UUID, action: GoodbyeAction, template: GoodbyeTemplate?, note: String?, edited: Bool) {
+        goodbyeAnswers[promptID] = action
+        if action == .sent, let matchID = goodbyeMatches[promptID] { unmatch(matchID) }
+    }
+
     func missedConnections() -> [MissedConnection] {
         missed
     }
@@ -925,6 +964,7 @@ actor DemoBackend: GlimpseBackend {
 
     func vibeSubmitResult(matchID: UUID, outcome: VibeOutcome) -> Bool {
         let verified = outcome == .matched // the demo partner always felt it too
+        if outcome == .friendly { friendlyVibes.insert(matchID) }
         vibeStates[matchID]?.status = outcome == .report ? .disabled : .completed
         vibeStates[matchID]?.vibeVerified = verified
         if verified {

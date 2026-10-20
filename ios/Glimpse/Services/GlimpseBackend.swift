@@ -75,6 +75,10 @@ protocol GlimpseBackend: AnyObject, Sendable {
     func setPinned(_ matchID: UUID, pinned: Bool) async throws
     func pinnedMatchIDs() async throws -> Set<UUID>
     func submitExitFeedback(matchID: UUID, reason: ExitReason) async throws
+    /// Whether to offer a kind goodbye here (the server decides, and records the offer).
+    func goodbyeOffer(matchID: UUID, context: GoodbyeContext) async throws -> GoodbyeOffer
+    /// What they did with it; `.sent` closes the chat and delivers the note.
+    func goodbyeRespond(promptID: UUID, action: GoodbyeAction, template: GoodbyeTemplate?, note: String?, edited: Bool) async throws
     func missedConnections() async throws -> [MissedConnection]
     func requestSecondChance(matchID: UUID) async throws
     func secondChances() async throws -> [SecondChance]

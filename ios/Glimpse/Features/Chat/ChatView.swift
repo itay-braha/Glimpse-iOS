@@ -9,6 +9,10 @@ struct ChatView: View {
     @State private var model: ChatModel
     @State private var showReport = false
     @State private var confirmUnmatch = false
+    /// A kind-goodbye offer from the server, and whether it was answered.
+    @State private var goodbye: GoodbyeOffer?
+    @State private var goodbyeAnswered = false
+    @State private var activeGoodbye: GoodbyeOffer?
     @State private var showExitSurvey = false
     @State private var showPropose = false
     @State private var showCall = false
@@ -240,7 +244,9 @@ struct ChatView: View {
                     }
                     Button("About the Vibe Check", systemImage: "video.bubble") { showVibeInfo = true }
                     Button("Unmatch", systemImage: "xmark.circle", role: .destructive) {
-                        confirmUnmatch = true
+                        Task {
+                            if !(await offerGoodbye(.unmatch)) { confirmUnmatch = true }
+                        }
                     }
                     Button("Report or block", systemImage: "flag") {
                         showReport = true
@@ -279,19 +285,32 @@ struct ChatView: View {
         }
         .confirmationDialog("Unmatch \(model.match.displayName)?", isPresented: $confirmUnmatch, titleVisibility: .visible) {
             Button("Unmatch", role: .destructive) {
-                Task {
-                    try? await app.backend.unmatch(model.match.matchID)
-                    // Only after a real conversation, and at most once a week.
-                    if model.messages.count >= 3, SurveyPacing.mayAsk() {
-                        SurveyPacing.recordAsked()
-                        showExitSurvey = true
-                    } else {
-                        leave()
-                    }
-                }
+                Task { await unmatchNow() }
             }
         } message: {
             Text("This frees a spot. You won't see each other again.")
+        }
+        .sheet(item: $goodbye, onDismiss: {
+            // Swiped away without choosing counts as "not now".
+            if let offer = activeGoodbye, !goodbyeAnswered { answerGoodbye(offer, .dismissed) }
+            activeGoodbye = nil
+        }) { offer in
+            KindGoodbyeSheet(
+                name: model.match.displayName,
+                trigger: offer.trigger ?? .stoppedReplying,
+                onSend: { template, note, edited in
+                    answerGoodbye(offer, .sent, template: template, note: note, edited: edited)
+                },
+                onDecline: { action in answerGoodbye(offer, action) }
+            )
+        }
+        .task {
+            // Now and then, a fading chat gets a kind way out (the server decides when).
+            // (Scripted screenshot and test runs skip it so it doesn't cover the flow.)
+            guard app.launch.screen == nil else { return }
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            _ = await offerGoodbye(.chatOpen)
         }
         .sheet(isPresented: $showExitSurvey) {
             ExitSurveySheet(name: model.match.displayName) { reason in
@@ -548,8 +567,48 @@ struct ChatView: View {
         }
         switch outcome {
         case .matched: break
-        case .friendly: friendlyFollowUp = true
+        case .friendly:
+            Task { if !(await offerGoodbye(.chatOpen)) { friendlyFollowUp = true } }
         case .report: showReport = true
+        }
+    }
+
+    /// Unmatches, then (after a real conversation, at most once a week) asks why.
+    private func unmatchNow() async {
+        try? await app.backend.unmatch(model.match.matchID)
+        if model.messages.count >= 3, SurveyPacing.mayAsk() {
+            SurveyPacing.recordAsked()
+            showExitSurvey = true
+        } else {
+            leave()
+        }
+    }
+
+    /// Asks the server whether a kind goodbye fits right now, and shows it if so.
+    private func offerGoodbye(_ context: GoodbyeContext) async -> Bool {
+        guard let offer = try? await app.backend.goodbyeOffer(matchID: model.match.matchID, context: context),
+              offer.show, offer.promptID != nil, offer.trigger != nil else { return false }
+        goodbyeAnswered = false
+        activeGoodbye = offer
+        goodbye = offer
+        return true
+    }
+
+    private func answerGoodbye(_ offer: GoodbyeOffer, _ action: GoodbyeAction,
+                               template: GoodbyeTemplate? = nil, note: String? = nil, edited: Bool = false) {
+        guard let promptID = offer.promptID else { return }
+        goodbyeAnswered = true
+        app.track("goodbye_\(action.rawValue)", ["trigger": offer.trigger?.rawValue ?? ""])
+        Task {
+            try? await app.backend.goodbyeRespond(promptID: promptID, action: action, template: template, note: note, edited: edited)
+            switch action {
+            case .sent: leave()
+            case .unmatchedWithoutNote:
+                // Let the goodbye sheet finish closing before the exit survey opens.
+                try? await Task.sleep(for: .milliseconds(500))
+                await unmatchNow()
+            case .dismissed, .keptChatting: break
+            }
         }
     }
 

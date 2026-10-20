@@ -356,6 +356,16 @@ final class SupabaseBackend: GlimpseBackend {
         return Set(ids)
     }
 
+    func goodbyeOffer(matchID: UUID, context: GoodbyeContext) async throws -> GoodbyeOffer {
+        try await client.rpc("goodbye_offer", params: ["p_match": matchID.uuidString, "p_context": context.rawValue]).execute().value
+    }
+
+    func goodbyeRespond(promptID: UUID, action: GoodbyeAction, template: GoodbyeTemplate?, note: String?, edited: Bool) async throws {
+        try await client.rpc("goodbye_respond", params: GoodbyeRespondParams(
+            prompt: promptID, action: action.rawValue, template: template?.rawValue, note: note, edited: edited
+        )).execute()
+    }
+
     func submitExitFeedback(matchID: UUID, reason: ExitReason) async throws {
         try await client.rpc(
             "submit_exit_feedback",
@@ -1104,6 +1114,32 @@ private struct ProposeDateParams: Encodable, Sendable {
         case match = "p_match"
         case suggestion = "p_suggestion"
         case at = "p_at"
+    }
+}
+
+private struct GoodbyeRespondParams: Encodable, Sendable {
+    let prompt: UUID
+    let action: String
+    let template: String?
+    let note: String?
+    let edited: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case prompt = "p_prompt"
+        case action = "p_action"
+        case template = "p_template"
+        case note = "p_note"
+        case edited = "p_edited"
+    }
+
+    // Every argument is sent, nulls included, so the call matches the function.
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(prompt, forKey: .prompt)
+        try container.encode(action, forKey: .action)
+        try container.encode(template, forKey: .template)
+        try container.encode(note, forKey: .note)
+        try container.encode(edited, forKey: .edited)
     }
 }
 
