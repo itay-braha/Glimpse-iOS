@@ -240,7 +240,8 @@ final class FlowTests: XCTestCase {
         pause(1)
         snap("14-3 The live pass")
         redeem.tap()
-        let confirm = app.buttons["Redeem"]
+        // The confirmation can appear twice in the tree (sheet + popover); either is the same button.
+        let confirm = app.buttons["Redeem"].firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 5))
         confirm.tap()
         XCTAssertTrue(app.descendants(matching: .any)["deal.redeemed"].waitForExistence(timeout: 10))
