@@ -220,6 +220,48 @@ final class FlowTests: XCTestCase {
         snap("3-9 Vibe Verified")
     }
 
+    // Sign-up ends with a selfie check: pose, record, wait for a person, then the feed.
+    func testSelfieCheckDuringSignUp() {
+        let app = XCUIApplication()
+        continueAfterFailure = false
+        app.launchArguments = ["-demo", "-screen", "firstVideo", "-requireSelfie", "-allowCapture"]
+        app.launch()
+
+        // First clip, as in the main onboarding test.
+        let idea = app.buttons["hub.inspiration"]
+        XCTAssertTrue(idea.waitForExistence(timeout: 20))
+        idea.tap()
+        let camera = app.buttons["inspiration.camera.best_friend"]
+        XCTAssertTrue(camera.waitForExistence(timeout: 10))
+        camera.tap()
+        let sample = app.buttons["Use a sample moment"]
+        XCTAssertTrue(sample.waitForExistence(timeout: 10))
+        sample.tap()
+
+        // Then the selfie check, not the feed.
+        let getPose = app.buttons["selfie.getPose"]
+        XCTAssertTrue(getPose.waitForExistence(timeout: 20))
+        snap("15-1 One quick selfie")
+        getPose.tap()
+        let record = app.buttons["selfie.record"]
+        XCTAssertTrue(record.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["selfie.pose"].waitForExistence(timeout: 5))
+        snap("15-2 The pose")
+        record.tap()
+        let selfieSample = app.buttons["Use a sample moment"]
+        XCTAssertTrue(selfieSample.waitForExistence(timeout: 10))
+        selfieSample.tap()
+
+        let checkAgain = app.buttons["selfie.checkAgain"]
+        XCTAssertTrue(checkAgain.waitForExistence(timeout: 15))
+        snap("15-3 Waiting for a person to check it")
+        // In the demo a reviewer says yes a moment later.
+        pause(4)
+        checkAgain.tap()
+        XCTAssertTrue(app.buttons["Glimpse"].firstMatch.waitForExistence(timeout: 20))
+        snap("15-4 Approved: the feed")
+    }
+
     // Coffee deals: list, "are you here?", the live pass, staff redeem.
     func testCoffeeDeal() {
         let app = launch("connections")

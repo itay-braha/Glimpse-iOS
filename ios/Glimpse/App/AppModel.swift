@@ -30,6 +30,8 @@ final class AppModel {
         case signedOut
         case needsProfile
         case needsVideo
+        /// Everyone records a gesture selfie after their first clip; a person approves it.
+        case needsSelfie
         /// Held for review after AI-generated media reports; a selfie check restores access.
         case needsVerification
         case blocked(String)
@@ -42,6 +44,8 @@ final class AppModel {
 
     private(set) var phase: Phase = .launching
     private(set) var profile: UserProfile?
+    /// Whether the selfie check is done (or not required for this member).
+    private(set) var selfieCleared = true
     var selectedTab: AppTab = .discover
     var connectionsPath: [MatchSummary] = []
     /// Bumped whenever matches change elsewhere (e.g. a new match from the feed).
@@ -71,7 +75,7 @@ final class AppModel {
             backend = SupabaseBackend(config: config)
         } else {
             let seeded = launch.screen != nil && launch.screen != .welcome
-            backend = DemoBackend(seeded: seeded, withVideos: launch.screen != .firstVideo, vibeVerified: launch.screen == .dateIdea)
+            backend = DemoBackend(seeded: seeded, withVideos: launch.screen != .firstVideo, vibeVerified: launch.screen == .dateIdea, requireSelfie: launch.requireSelfie)
         }
         switch launch.screen {
         case .connections, .chat, .dateIdea: selectedTab = .connections
@@ -110,6 +114,7 @@ final class AppModel {
                     phase = .blocked(blockedMessage(for: state.reason ?? state.status))
                     return
                 }
+                selfieCleared = state.selfieCleared ?? true
             }
             profile = try await backend.fetchMyProfile()
             route()
@@ -128,6 +133,17 @@ final class AppModel {
             profile = fresh
             if phase == .needsVideo { route() }
         }
+    }
+
+    /// Re-reads the selfie check's outcome (the waiting screen polls this; a push also nudges it).
+    func refreshSelfieStatus() async {
+        if let state = try? await backend.accountState() {
+            selfieCleared = state.selfieCleared ?? true
+        }
+        if let fresh = try? await backend.fetchMyProfile() {
+            profile = fresh
+        }
+        if phase == .needsSelfie { route() }
     }
 
     func signOut() async {
@@ -338,7 +354,11 @@ final class AppModel {
         if profile.isOnboarded, phase == .needsVideo {
             track("onboarding_completed")
         }
-        phase = profile.isOnboarded ? .ready : .needsVideo
+        guard profile.isOnboarded else {
+            phase = .needsVideo
+            return
+        }
+        phase = selfieCleared ? .ready : .needsSelfie
     }
 
     private func blockedMessage(for reason: String?) -> String {

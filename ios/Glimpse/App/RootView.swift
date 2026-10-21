@@ -16,6 +16,8 @@ struct RootView: View {
                 ProfileBasicsView()
             case .needsVideo:
                 FirstVideoView()
+            case .needsSelfie:
+                SelfieCheckView()
             case .needsVerification:
                 VerifyToContinueView()
             case let .blocked(message):

@@ -31,6 +31,8 @@ struct LaunchOptions: Sendable {
     var screen: Screen?
     /// Show the one-time feed tips even in scripted runs (`-showTips`).
     var showTips = false
+    /// Demo only (`-requireSelfie`): sign-up needs the selfie check, approved a moment after it's sent.
+    var requireSelfie = false
     /// Clip time for scripted runs (`-clipSeconds 12`), so slow simulators don't race the timer.
     var clipSeconds: Double?
 
@@ -40,6 +42,7 @@ struct LaunchOptions: Sendable {
         options.forceDemo = arguments.contains("-demo")
         options.allowCapture = arguments.contains("-allowCapture")
         options.showTips = arguments.contains("-showTips")
+        options.requireSelfie = arguments.contains("-requireSelfie")
         if let index = arguments.firstIndex(of: "-clipSeconds"), arguments.indices.contains(index + 1) {
             options.clipSeconds = Double(arguments[index + 1])
         }

@@ -11,6 +11,7 @@ actor DemoBackend: GlimpseBackend {
     private let me = DemoData.meID
     private var signedIn: Bool
     private var profile: UserProfile?
+    private let requireSelfie: Bool
     private var height = HeightSetting.unanswered
     private var goodbyeShown: [UUID: Date] = [:]
     private var goodbyeAnswers: [UUID: GoodbyeAction] = [:]
@@ -59,8 +60,9 @@ actor DemoBackend: GlimpseBackend {
 
     /// - Parameter seeded: start signed in with a complete profile and 15 matches.
     /// `withVideos: false` starts signed in but before the first moment (onboarding's video hub).
-    init(seeded: Bool = true, withVideos: Bool = true, vibeVerified: Bool = false, now: Date = .now) {
+    init(seeded: Bool = true, withVideos: Bool = true, vibeVerified: Bool = false, requireSelfie: Bool = false, now: Date = .now) {
         demoVibeVerified = vibeVerified
+        self.requireSelfie = requireSelfie
         signedIn = seeded
         profile = seeded ? DemoData.myProfile() : nil
         videos = seeded && withVideos ? DemoData.myVideos(now: now) : []
@@ -171,7 +173,8 @@ actor DemoBackend: GlimpseBackend {
             status: "active",
             reason: nil,
             pausedUntil: (pausedUntil ?? .distantPast) > .now ? pausedUntil : nil,
-            isPlus: isPlus
+            isPlus: isPlus,
+            selfieCleared: !requireSelfie || profile?.isVerified == true
         )
     }
 
@@ -1081,6 +1084,16 @@ actor DemoBackend: GlimpseBackend {
     func submitVerification(_ challenge: VerificationChallenge, clip: RecordedClip) async throws {
         try await Task.sleep(for: .milliseconds(500))
         profile?.verificationStatus = "pending"
+        // Like a reviewer saying yes a moment later, so the whole flow can be tried.
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            self.demoApproveSelfie()
+        }
+    }
+
+    private func demoApproveSelfie() {
+        profile?.verificationStatus = "verified"
+        profile?.isVerified = true
     }
 
     // MARK: Telemetry
