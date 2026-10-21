@@ -14,7 +14,7 @@ enum LegalDocument: String, Identifiable, CaseIterable {
 
     /// Bump on every material change: members are asked to accept again.
     static let version = "2026-10-18"
-    static let contactEmail = "support@glimpse.invalid"
+    static let contactEmail = "support@lugipod.com"
 
     var id: String { rawValue }
 
