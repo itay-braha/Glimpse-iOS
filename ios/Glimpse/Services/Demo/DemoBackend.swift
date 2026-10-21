@@ -66,6 +66,11 @@ actor DemoBackend: GlimpseBackend {
         signedIn = seeded
         profile = seeded ? DemoData.myProfile() : nil
         videos = seeded && withVideos ? DemoData.myVideos(now: now) : []
+        if requireSelfie {
+            // A new member hasn't done the selfie check yet.
+            profile?.isVerified = false
+            profile?.verificationStatus = "none"
+        }
         if seeded && !withVideos { profile?.isOnboarded = false }
         candidates = DemoData.feed(now: now)
         matches = seeded ? DemoData.matches(now: now) : []
