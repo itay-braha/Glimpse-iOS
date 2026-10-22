@@ -10,6 +10,9 @@ struct SelfieCheckView: View {
     @State private var showRecorder = false
     @State private var isLoading = false
     @State private var errorMessage: String?
+    /// nil until checked; true when iOS hasn't been asked about notifications yet.
+    @State private var canAskForAlerts: Bool?
+    @State private var alertsOn = false
 
     private var status: String { app.profile?.verificationStatus ?? "none" }
     private var isWaiting: Bool { status == "pending" }
@@ -33,6 +36,8 @@ struct SelfieCheckView: View {
         .task {
             // Picks up an approval that came while the app was closed, then keeps checking.
             await app.refreshSelfieStatus()
+            alertsOn = await PushNotifications.shared.isAuthorized()
+            canAskForAlerts = await PushNotifications.shared.needsToAsk()
         }
         .task(id: isWaiting) {
             while isWaiting, !Task.isCancelled {
@@ -116,7 +121,7 @@ struct SelfieCheckView: View {
     private var waiting: some View {
         OnboardingScaffold(
             title: "We're checking your selfie",
-            subtitle: "A person on our team is comparing it with your clips, usually within a day. We'll notify you the moment you're in."
+            subtitle: "A person on our team is comparing it with your clips, usually within a day."
         ) {
             HStack(spacing: 14) {
                 ProgressView().tint(Palette.mint)
@@ -128,8 +133,28 @@ struct SelfieCheckView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Palette.surface, in: .rect(cornerRadius: 16))
             .accessibilityIdentifier("selfie.waiting")
+            if alertsOn {
+                Label("We'll notify you the moment you're in.", systemImage: "bell.badge.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(Palette.mint)
+            } else if canAskForAlerts == false {
+                Text("Open Glimpse any time to check. It updates by itself.")
+                    .font(.subheadline)
+                    .foregroundStyle(Palette.textSecondary)
+            }
         } footer: {
             VStack(spacing: 10) {
+                if canAskForAlerts == true && !alertsOn {
+                    Button("Notify me when I'm in", systemImage: "bell") {
+                        Task {
+                            await app.notifyWhenApproved()
+                            alertsOn = await PushNotifications.shared.isAuthorized()
+                            canAskForAlerts = false
+                        }
+                    }
+                    .buttonStyle(.glimpse)
+                    .accessibilityIdentifier("selfie.notifyMe")
+                }
                 Button("Check again") {
                     Task { await app.refreshSelfieStatus() }
                 }

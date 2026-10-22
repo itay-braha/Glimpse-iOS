@@ -90,6 +90,8 @@ final class AppModel {
 
     func start() async {
         guard phase == .launching else { return }
+        // So a notification token can upload from the first screen (e.g. during the selfie wait).
+        PushNotifications.shared.app = self
         guard await backend.restoreSession() != nil else {
             phase = .signedOut
             return
@@ -118,6 +120,9 @@ final class AppModel {
             }
             profile = try await backend.fetchMyProfile()
             route()
+            if profile != nil, phase != .ready {
+                Task { await recordSignUpConsent() }
+            }
         } catch {
             phase = .blocked(GlimpseError.describe(error))
         }
@@ -126,6 +131,24 @@ final class AppModel {
     func profileCreated(_ profile: UserProfile) {
         self.profile = profile
         route()
+        Task { await recordSignUpConsent() }
+    }
+
+    /// Records what was agreed on the welcome screen and the phone's language, as soon as
+    /// a profile exists (before clips and the selfie are stored). Retried on every launch.
+    private func recordSignUpConsent() async {
+        await backend.setLocale(ConsentStore.languageCode)
+        if let pending = ConsentStore.pendingVersion {
+            if (try? await backend.recordConsents(["terms", "sensitive_data"], version: pending, locale: ConsentStore.languageCode)) != nil {
+                ConsentStore.markRecorded(pending)
+            }
+        }
+    }
+
+    /// From the selfie waiting screen: a notification when a person approves the selfie.
+    func notifyWhenApproved() async {
+        nudges.recordFirstChoice()
+        await PushNotifications.shared.requestAuthorizationAndRegister()
     }
 
     func refreshProfile() async {
@@ -200,15 +223,8 @@ final class AppModel {
     /// Tells the server the phone's language, records what was agreed at sign-up,
     /// and asks again if the terms changed since.
     private func syncLanguageAndConsent() async {
-        await backend.setLocale(ConsentStore.languageCode)
-        if let pending = ConsentStore.pendingVersion {
-            do {
-                try await backend.recordConsents(["terms", "sensitive_data"], version: pending, locale: ConsentStore.languageCode)
-                ConsentStore.markRecorded(pending)
-            } catch {
-                return // retried next launch
-            }
-        }
+        await recordSignUpConsent()
+        if ConsentStore.pendingVersion != nil { return } // not recorded yet: retried next launch
         guard launch.screen == nil else { return } // scripted runs stay prompt-free
         let onRecord = (try? await backend.myConsentVersion()) ?? ConsentStore.acceptedVersion
         if onRecord != ConsentStore.currentVersion {
