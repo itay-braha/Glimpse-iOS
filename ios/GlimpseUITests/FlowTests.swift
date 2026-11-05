@@ -411,6 +411,10 @@ final class FlowTests: XCTestCase {
         XCTAssertTrue(waitUntilGone(notNow, timeout: 5))
 
         app.tabBars.buttons["Connections"].tap()
+        // The deals card loads a moment after the list and shifts every row down; a hold that
+        // starts before it lands is cancelled, so wait for it first.
+        XCTAssertTrue(app.buttons["matches.deals"].waitForExistence(timeout: 10))
+        pause(0.5)
         let hila = app.cells.containing(NSPredicate(format: "label CONTAINS 'Hila'")).firstMatch
         // The list loads rows as they scroll in; the deals card can push her below the fold.
         for _ in 0..<3 where !hila.waitForExistence(timeout: 5) {
@@ -712,8 +716,13 @@ final class FlowTests: XCTestCase {
         XCTAssertTrue(trash.waitForExistence(timeout: 5))
         pause(1.5)
         snap("10-3 Locked: recording hands-free")
+        let incoming = app.descendants(matching: .any).matching(identifier: "bubble.incoming")
+        let incomingBefore = incoming.count
         app.buttons["chat.send"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["bubble.voice"].waitForExistence(timeout: 15))
+        // The demo match reacts, types and answers about 3 s later; that reply re-lays the chat
+        // and cancels a hold in progress, so let it land before holding the message.
+        XCTAssertTrue(incoming.element(boundBy: incomingBefore).waitForExistence(timeout: 10), "the demo reply arrives")
         pause(1)
         snap("10-4 Voice message sent")
 
