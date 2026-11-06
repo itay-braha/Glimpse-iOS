@@ -35,7 +35,12 @@ struct EditProfileView: View {
             Form {
                 Section("About you") {
                     TextField("First name", text: $name)
-                    TextField("City", text: $city)
+                    NavigationLink {
+                        CityPickerScreen(city: $city)
+                    } label: {
+                        LabeledContent("City", value: city.isEmpty ? String(localized: "Not set") : city)
+                    }
+                    .accessibilityIdentifier("edit.city")
                     TextField("One line about you", text: $bio, axis: .vertical)
                         .lineLimit(2...4)
                 }

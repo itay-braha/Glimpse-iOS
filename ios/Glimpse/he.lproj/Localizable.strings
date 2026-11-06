@@ -1262,3 +1262,16 @@
 "We'll notify you the moment you're in." = "נעדכן אותך ברגע שאת/ה בפנים.";
 "Open Glimpse any time to check. It updates by itself." = "אפשר לפתוח את Glimpse בכל זמן לבדוק. זה מתעדכן לבד.";
 "Notify me when I'm in" = "עדכנו אותי כשאני בפנים";
+
+/* Onboarding redesign: digit slots, city search, example Glimpses. */
+"No need for the leading 0, the country code covers it." = "אין צורך ב-0 בהתחלה, קידומת המדינה כבר מכסה אותו.";
+"Country: %@, +%@" = "מדינה: %1$@, ‎+%2$@";
+"Search for your city" = "חיפוש העיר שלך";
+"No city by that name. Try another spelling." = "לא מצאנו עיר בשם הזה. נסו כתיב אחר.";
+"Finding you…" = "מאתרים אותך…";
+"Use my current location" = "שימוש במיקום הנוכחי שלי";
+"Change city" = "החלפת עיר";
+"We couldn't get your location. Turn on Location for Glimpse in Settings, or search for your city." = "לא הצלחנו לקבל את המיקום שלך. הפעילו שירותי מיקום ל-Glimpse בהגדרות, או חפשו את העיר שלכם.";
+"We found you, but not your city's name. Search for it instead." = "מצאנו אותך, אבל לא את שם העיר. חפשו אותה במקום.";
+"Example" = "דוגמה";
+"Example Glimpse: %@, %lld. %@" = "Glimpse לדוגמה: %1$@, %2$lld. %3$@";

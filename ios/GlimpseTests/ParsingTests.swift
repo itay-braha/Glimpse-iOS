@@ -35,6 +35,20 @@ struct ParsingTests {
         #expect(PhoneNumber.e164(dialCode: "44", national: "12") == nil)
     }
 
+    @Test func pastedNumbersFillTheSlots() throws {
+        let israel = try #require(DialCode.all.first { $0.regionCode == "IL" })
+        #expect(PhoneNumber.nationalDigits("054-123-4567", dialCode: israel) == "541234567")
+        #expect(PhoneNumber.nationalDigits("+972 54-123-4567", dialCode: israel) == "541234567")
+        #expect(PhoneNumber.nationalDigits("00972541234567", dialCode: israel) == "541234567")
+        #expect(PhoneNumber.isComplete("541234567", dialCode: israel))
+        #expect(!PhoneNumber.isComplete("54123", dialCode: israel))
+
+        let us = try #require(DialCode.all.first { $0.regionCode == "US" })
+        #expect(PhoneNumber.nationalDigits("+1 (415) 555-0100", dialCode: us) == "4155550100")
+        #expect(PhoneNumber.nationalDigits("14155550100", dialCode: us) == "4155550100")
+        #expect(PhoneNumber.nationalDigits("415555010099", dialCode: us) == "4155550100")
+    }
+
     @Test func birthdatesRoundTrip() throws {
         let date = try #require(BirthdateFormat.date(from: "1998-05-14"))
         #expect(BirthdateFormat.string(from: date).hasPrefix("1998-05-1"))

@@ -4,6 +4,7 @@ struct CodeEntryView: View {
     @Environment(AppModel.self) private var app
     @Bindable var model: AuthFlowModel
     @FocusState private var focused: Bool
+    @State private var verified = 0
 
     var body: some View {
         OnboardingScaffold(
@@ -19,14 +20,17 @@ struct CodeEntryView: View {
                     .opacity(0.02)
                     .accessibilityLabel("Six digit code")
 
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     ForEach(0..<6, id: \.self) { index in
-                        CodeDigitBox(
+                        DigitSlot(
                             digit: digit(at: index),
-                            isActive: focused && index == min(model.code.count, 5)
+                            isActive: focused && index == model.code.count,
+                            height: 64
                         )
                     }
                 }
+                .environment(\.layoutDirection, .leftToRight)
+                .shake(trigger: model.failedAttempts)
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
             }
@@ -57,6 +61,9 @@ struct CodeEntryView: View {
             .disabled(model.code.count != 6 || model.isWorking)
         }
         .onAppear { focused = true }
+        .sensoryFeedback(.selection, trigger: model.code.count)
+        .sensoryFeedback(.error, trigger: model.failedAttempts)
+        .sensoryFeedback(.success, trigger: verified)
         .onChange(of: model.code) { _, newValue in
             let digits = String(newValue.filter(\.isNumber).prefix(6))
             if digits != newValue {
@@ -67,34 +74,17 @@ struct CodeEntryView: View {
         }
     }
 
-    private func digit(at index: Int) -> String {
-        guard index < model.code.count else { return "" }
-        return String(model.code[model.code.index(model.code.startIndex, offsetBy: index)])
+    private func digit(at index: Int) -> Character? {
+        guard index < model.code.count else { return nil }
+        return model.code[model.code.index(model.code.startIndex, offsetBy: index)]
     }
 
     private func submit() {
         Task {
             if await model.verify(using: app.backend) {
+                verified += 1
                 await app.completeSignIn()
             }
         }
-    }
-}
-
-private struct CodeDigitBox: View {
-    let digit: String
-    let isActive: Bool
-
-    var body: some View {
-        Text(digit)
-            .font(.system(.title, design: .rounded, weight: .bold))
-            .monospacedDigit()
-            .frame(maxWidth: .infinity)
-            .frame(height: 62)
-            .background(Palette.surfaceRaised, in: .rect(cornerRadius: 14))
-            .overlay {
-                RoundedRectangle(cornerRadius: 14)
-                    .strokeBorder(isActive ? Palette.mint : Palette.stroke, lineWidth: isActive ? 2 : 1)
-            }
     }
 }

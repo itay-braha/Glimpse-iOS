@@ -88,7 +88,7 @@ final class FlowTests: XCTestCase {
         let phone = app.textFields["Mobile number"]
         XCTAssertTrue(phone.waitForExistence(timeout: 5))
         phone.tap()
-        phone.typeText("5550100")
+        phone.typeText("4155550100")
         snap("1-2 Phone number")
         app.buttons["Send code"].tap()
 

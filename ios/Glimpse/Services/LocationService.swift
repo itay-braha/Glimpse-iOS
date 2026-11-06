@@ -38,6 +38,15 @@ enum LocationService {
         }
     }
 
+    /// The city at a point ("Tel Aviv-Yafo"), in the phone's language, for the
+    /// "Use my current location" button. Nil when Apple can't name one.
+    static func cityName(at coordinate: Coordinate) async -> String? {
+        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        guard let placemarks = try? await CLGeocoder().reverseGeocodeLocation(location),
+              let place = placemarks.first else { return nil }
+        return place.locality ?? place.subAdministrativeArea
+    }
+
     /// Straight-line metres between two points.
     static func meters(from a: Coordinate, to b: Coordinate) -> Double {
         CLLocation(latitude: a.latitude, longitude: a.longitude)

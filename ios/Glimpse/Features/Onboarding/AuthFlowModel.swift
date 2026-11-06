@@ -16,11 +16,13 @@ final class AuthFlowModel {
     var code = ""
     private(set) var isWorking = false
     var errorMessage: String?
+    /// Bumped on every rejected code, so the code slots can shake.
+    private(set) var failedAttempts = 0
 
     private(set) var e164: String?
 
     var canSendCode: Bool {
-        PhoneNumber.e164(dialCode: dialCode.code, national: nationalNumber) != nil && !isWorking
+        PhoneNumber.isComplete(nationalNumber, dialCode: dialCode) && !isWorking
     }
 
     func sendCode(using backend: any GlimpseBackend) async {
@@ -52,6 +54,7 @@ final class AuthFlowModel {
             return true
         } catch {
             code = ""
+            failedAttempts += 1
             errorMessage = GlimpseError.describe(error)
             return false
         }

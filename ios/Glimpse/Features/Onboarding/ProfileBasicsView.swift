@@ -8,6 +8,9 @@ struct ProfileBasicsView: View {
     @State private var gender: Gender?
     @State private var interestedIn: Set<Gender> = []
     @State private var city = ""
+    /// Set by "Use my current location"; sent once the profile exists so the city
+    /// waitlist can count this member right away.
+    @State private var located: LocationService.Coordinate?
     @State private var bio = ""
     @State private var heightCm: Int?
     @State private var hidesHeight = false
@@ -71,11 +74,7 @@ struct ProfileBasicsView: View {
             HeightChooser(heightCm: $heightCm, hidesHeight: $hidesHeight)
 
             FieldLabel("City")
-            TextField("Where you're based", text: $city)
-                .textContentType(.addressCity)
-                .padding(.horizontal, 16)
-                .frame(height: 56)
-                .background(Palette.surfaceRaised, in: .rect(cornerRadius: 16))
+            CityField(city: $city) { located = $0 }
 
             FieldLabel("One line about you")
             TextField("Optional", text: $bio, axis: .vertical)
@@ -119,6 +118,9 @@ struct ProfileBasicsView: View {
         )
         do {
             let profile = try await app.backend.createProfile(draft)
+            if let located {
+                try? await app.backend.updateLocation(latitude: located.latitude, longitude: located.longitude)
+            }
             app.profileCreated(profile)
         } catch {
             errorMessage = GlimpseError.describe(error)

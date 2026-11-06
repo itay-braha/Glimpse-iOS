@@ -22,7 +22,7 @@ struct InspirationView: View {
             ScrollView(.horizontal) {
                 LazyHStack(spacing: 14) {
                     ForEach(VibePrompt.inspiration) { prompt in
-                        InspirationCard(prompt: prompt) { recording = prompt }
+                        InspirationCard(prompt: prompt, isCurrent: prompt == current) { recording = prompt }
                             .containerRelativeFrame(.horizontal)
                             .scrollTransition { content, phase in
                                 content
@@ -63,16 +63,26 @@ struct InspirationView: View {
     }
 }
 
+/// A prompt with an example Glimpse for it playing behind, then the camera button.
 private struct InspirationCard: View {
     let prompt: VibePrompt
+    let isCurrent: Bool
     let onRecord: () -> Void
+
+    private var example: ShowcaseClip { .example(for: prompt) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(prompt.emoji)
-                .font(.system(size: 68))
-                .accessibilityHidden(true)
-            Spacer(minLength: 24)
+            HStack {
+                Text(verbatim: "\(example.name), \(example.age)")
+                    .font(.glimpseHeadline)
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.4), radius: 6)
+                Spacer()
+                ExampleTag()
+            }
+            .accessibilityHidden(true)
+            Spacer(minLength: 160)
             Text(prompt.text)
                 .font(.glimpseTitle)
                 .foregroundStyle(.white)
@@ -88,11 +98,20 @@ private struct InspirationCard: View {
             .accessibilityIdentifier("inspiration.camera.\(prompt.rawValue)")
         }
         .padding(22)
-        .frame(maxWidth: .infinity, minHeight: 430, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 450, alignment: .leading)
         .background {
             ZStack {
-                Palette.seededGradient(prompt.rawValue)
-                LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .center, endPoint: .bottom)
+                ShowcaseStage(clip: example, isActive: isCurrent, subjectLift: 0.2)
+                LinearGradient(
+                    stops: [
+                        .init(color: .black.opacity(0.35), location: 0),
+                        .init(color: .clear, location: 0.18),
+                        .init(color: .clear, location: 0.4),
+                        .init(color: .black.opacity(0.75), location: 1),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
             }
             .clipShape(.rect(cornerRadius: 28))
         }
