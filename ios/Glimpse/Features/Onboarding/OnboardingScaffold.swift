@@ -18,6 +18,7 @@ struct OnboardingScaffold<Content: View, Footer: View>: View {
                     .frame(width: 44, height: 44)
                     .background(Palette.surfaceRaised, in: .circle)
                     .padding(.bottom, 20)
+                    .padding(.horizontal, 24)
             }
 
             ScrollView {
@@ -33,14 +34,17 @@ struct OnboardingScaffold<Content: View, Footer: View>: View {
                     content
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                // Padding inside the scroll view, so glows and the active digit slot's
+                // lift aren't clipped at the edges.
+                .padding(.horizontal, 24)
             }
             .scrollBounceBehavior(.basedOnSize)
             .scrollDismissesKeyboard(.interactively)
 
             footer
                 .padding(.top, 12)
+                .padding(.horizontal, 24)
         }
-        .padding(.horizontal, 24)
         .padding(.top, 8)
         .padding(.bottom, 12)
         .background(Palette.midnight.ignoresSafeArea())
